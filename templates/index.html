@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV Optimizer & Cover Letter Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📄 CV Optimizer</h1>
+            <p class="subtitle">Optimisez votre CV et générez une lettre de motivation personnalisée</p>
+        </header>
+
+        <main>
+            <!-- Main Tabs -->
+            <div class="main-tabs">
+                <button class="main-tab-btn active" data-main-tab="generation">
+                    <span class="tab-icon">✨</span>
+                    Génération
+                </button>
+                <button class="main-tab-btn" data-main-tab="history">
+                    <span class="tab-icon">📚</span>
+                    Historique
+                </button>
+            </div>
+
+            <!-- Generation Tab Content (Partie 1 - Rouge) -->
+            <div id="generation-content" class="main-tab-content active">
+            <!-- Configuration Section -->
+            <section class="config-section">
+                <h2>⚙️ Configuration</h2>
+                
+                <div class="form-group">
+                    <label for="api-key">
+                        Clé API OpenAI *
+                        <span class="tooltip-icon" data-tooltip="Votre clé d'API OpenAI est nécessaire pour utiliser les modèles de langage. Vous pouvez l'obtenir gratuitement sur https://platform.openai.com/account/api-keys. Cette clé est utilisée uniquement pour cette session et n'est jamais stockée.">?</span>
+                    </label>
+                    <input type="password" id="api-key" placeholder="sk-proj-..." required>
+                    <small>Votre clé API sera utilisée uniquement pour cette session</small>
+                </div>
+
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label for="language">Langue de sortie</label>
+                        <select id="language">
+                            <option value="fr">Français</option>
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                        </select>
+                        <small>Langue pour le CV et la lettre de motivation</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="model">
+                            Modèle
+                            <span class="tooltip-icon" data-tooltip="Le modèle de langage utilisé pour générer le CV et la lettre. GPT-4o-mini est recommandé pour un bon équilibre entre qualité et coût. GPT-4 offre une meilleure qualité mais est plus cher.">?</span>
+                        </label>
+                        <select id="model">
+                            <option value="gpt-4o-mini">GPT-4o-mini (Recommandé)</option>
+                            <option value="gpt-4">GPT-4</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="temperature">
+                            Température
+                            <span class="tooltip-icon" data-tooltip="Contrôle la créativité et la variété des réponses. Valeur basse (0.1-0.3) = plus déterministe et cohérent, idéal pour les CV. Valeur élevée (0.7-1.0) = plus créatif et varié, idéal pour les lettres de motivation.">?</span>
+                        </label>
+                        <input type="range" id="temperature" min="0" max="1" step="0.01" value="0.3">
+                        <span class="value-display" id="temp-value">0.30</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CV Input Section -->
+            <section class="input-section">
+                <h2>📋 Votre CV</h2>
+                
+                <div class="upload-options">
+                    <div class="upload-option">
+                        <label for="cv-file" class="upload-label">
+                            <span class="upload-icon">📎</span>
+                            <span>Upload PDF/TXT</span>
+                        </label>
+                        <input type="file" id="cv-file" accept=".pdf,.txt" hidden>
+                    </div>
+                    <div class="divider">ou</div>
+                    <div class="upload-option">
+                        <button type="button" class="btn-secondary" id="paste-cv-btn">Coller le texte</button>
+                    </div>
+                </div>
+
+                <div class="textarea-container">
+                    <textarea id="cv-text" placeholder="Votre CV (texte ou uploadé depuis un fichier)..." rows="8" class="hidden"></textarea>
+                    <div class="char-count hidden" id="cv-count">0 mots</div>
+                </div>
+                <div id="cv-upload-status" class="upload-status hidden">
+                    <span class="status-icon">✓</span>
+                    <span class="status-text">Fichier chargé avec succès</span>
+                </div>
+            </section>
+
+            <!-- Job Description Section -->
+            <section class="input-section">
+                <h2>💼 Description du Poste</h2>
+                
+                <div class="upload-options">
+                    <div class="upload-option">
+                        <label for="jd-file" class="upload-label">
+                            <span class="upload-icon">📎</span>
+                            <span>Upload PDF/TXT</span>
+                        </label>
+                        <input type="file" id="jd-file" accept=".pdf,.txt" hidden>
+                    </div>
+                    <div class="divider">ou</div>
+                    <div class="upload-option">
+                        <button type="button" class="btn-secondary" id="paste-jd-btn">Coller le texte</button>
+                    </div>
+                </div>
+
+                <div class="textarea-container">
+                    <textarea id="job-description" placeholder="Description du poste (texte ou uploadé depuis un fichier)..." rows="8" class="hidden"></textarea>
+                    <div class="char-count hidden" id="jd-count">0 mots</div>
+                </div>
+                <div id="jd-upload-status" class="upload-status hidden">
+                    <span class="status-icon">✓</span>
+                    <span class="status-text">Fichier chargé avec succès</span>
+                </div>
+            </section>
+
+            <!-- Skills Matching Section -->
+            <section class="skills-section">
+                <h2>🎯 Analyse des Compétences</h2>
+                
+                <div class="skills-legend">
+                    <div class="legend-item">
+                        <span class="legend-color legend-gray"></span>
+                        <span class="legend-text">Compétences uniquement dans le CV</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color legend-red"></span>
+                        <span class="legend-text">Compétences requises manquantes</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color legend-green"></span>
+                        <span class="legend-text">Compétences correspondantes</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color legend-blue"></span>
+                        <span class="legend-text">Compétences intéressantes du CV</span>
+                    </div>
+                </div>
+
+                <div id="skills-container" class="skills-container hidden">
+                    <div class="skills-stats" id="skills-stats"></div>
+                    <div class="skills-tags" id="skills-tags"></div>
+                </div>
+
+                <div id="skills-loading" class="skills-loading hidden">
+                    <div class="spinner-small"></div>
+                    <span>Analyse des compétences en cours...</span>
+                </div>
+
+                <div id="skills-empty" class="skills-empty">
+                    <p>📋 Chargez votre CV et la description du poste pour voir l'analyse des compétences</p>
+                </div>
+            </section>
+
+            <!-- CV Optimization Parameters -->
+            <section class="params-section">
+                <h2>🎯 Paramètres d'Optimisation du CV</h2>
+                
+                <div class="params-grid">
+                    <div class="form-group">
+                        <label for="min-experiences">Expériences min</label>
+                        <input type="number" id="min-experiences" min="1" max="20" value="3">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-experiences">Expériences max</label>
+                        <input type="number" id="max-experiences" min="1" max="20" value="8">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max-date-years">Années max (optionnel)</label>
+                        <input type="number" id="max-date-years" min="1" max="30" placeholder="Ex: 5">
+                        <small>Garder uniquement les X dernières années</small>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Cover Letter Parameters -->
+            <section class="params-section">
+                <h2>✉️ Paramètres de la Lettre de Motivation</h2>
+                
+                <div class="form-group">
+                    <label for="letter-words">Nombre de mots (par dizaines)</label>
+                    <input type="number" id="letter-words" min="100" max="1000" step="10" value="300">
+                    <small>Ex: 300 = environ 300 mots</small>
+                </div>
+            </section>
+
+            <!-- Action Buttons -->
+            <section class="actions-section">
+                <button id="optimize-btn" class="btn-primary">
+                    <span class="btn-icon">✨</span>
+                    Optimiser le CV
+                </button>
+                <button id="generate-letter-btn" class="btn-primary">
+                    <span class="btn-icon">✉️</span>
+                    Générer la Lettre de Motivation
+                </button>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results-section" class="results-section hidden">
+                <h2>📊 Résultats</h2>
+                
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="optimized-cv">CV Optimisé</button>
+                    <button class="tab-btn" data-tab="cover-letter">Lettre de Motivation</button>
+                </div>
+
+                <div class="tab-content active" id="optimized-cv-tab">
+                    <div class="result-header">
+                        <button class="btn-copy" data-copy="optimized-cv">📋 Copier</button>
+                        <button class="btn-download" data-download="optimized-cv">💾 Télécharger</button>
+                    </div>
+                    <div class="result-content" id="optimized-cv-content"></div>
+                </div>
+
+                <div class="tab-content" id="cover-letter-tab">
+                    <div class="result-header">
+                        <button class="btn-copy" data-copy="cover-letter">📋 Copier</button>
+                        <button class="btn-download" data-download="cover-letter">💾 Télécharger</button>
+                    </div>
+                    <div class="result-content" id="cover-letter-content"></div>
+                </div>
+            </section>
+            </div>
+            <!-- End Generation Tab Content -->
+
+            <!-- History Tab Content (Partie 2 - Vert) -->
+            <div id="history-content" class="main-tab-content">
+                <section class="history-section">
+                    <h2>📚 Historique des Générations</h2>
+                    <p class="history-description">Retrouvez tous vos CV optimisés et lettres de motivation générés pendant cette session et les précédentes.</p>
+                    
+                    <div class="history-filters">
+                        <button class="filter-btn active" data-filter="all">Tout</button>
+                        <button class="filter-btn" data-filter="cv">CV Optimisés</button>
+                        <button class="filter-btn" data-filter="letter">Lettres de Motivation</button>
+                        <button class="filter-btn danger" id="clear-history-btn">🗑️ Effacer l'historique</button>
+                    </div>
+
+                    <div id="history-list" class="history-list">
+                        <div class="history-empty">
+                            <p>📭 Aucun historique pour le moment</p>
+                            <p class="history-empty-subtitle">Vos générations apparaîtront ici après utilisation de la section Génération</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <!-- End History Tab Content -->
+
+            <!-- Loading Overlay -->
+            <div id="loading-overlay" class="loading-overlay hidden">
+                <div class="spinner"></div>
+                <p id="loading-text">Traitement en cours...</p>
+            </div>
+
+            <!-- Error Modal -->
+            <div id="error-modal" class="error-modal hidden">
+                <div class="error-modal-content">
+                    <div class="error-modal-header">
+                        <span>⚠️</span>
+                        <h3>Erreur</h3>
+                    </div>
+                    <div class="error-modal-body">
+                        <div id="error-message" class="error-modal-message"></div>
+                    </div>
+                    <div class="error-modal-footer">
+                        <button id="error-modal-close" class="error-modal-close">Fermer</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+

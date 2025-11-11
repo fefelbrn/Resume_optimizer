@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+uploads/
+*.log
+ANALYSE_CONFORMITE.md

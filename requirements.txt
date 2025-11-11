@@ -1,0 +1,9 @@
+flask>=3.0.0
+flask-cors>=4.0.0
+langchain>=0.3.0
+langchain-openai>=0.1.22
+pydantic>=2.8.0
+python-dotenv>=1.0.1
+PyPDF2>=3.0.0
+pdfplumber>=0.10.0
+openai>=1.0.0
