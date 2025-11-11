@@ -20,14 +20,44 @@ def parse_openai_error(error: Exception) -> Dict[str, Any]:
         Dictionary with error_code, error_message, and user_message
     """
     error_str = str(error)
+    error_type = type(error).__name__
     
     # Try to extract error information from the error string
     error_code = None
     error_message = error_str
-    user_message = "Une erreur s'est produite lors de l'appel à l'API OpenAI."
+    user_message = f"Une erreur s'est produite lors de l'appel à l'API OpenAI.\n\nDétails: {error_str}"
     
+    # Check error type first
+    if "AuthenticationError" in error_type or "InvalidRequestError" in error_type:
+        if "api_key" in error_str.lower() or "401" in error_str or "authentication" in error_str.lower():
+            error_code = 401
+            user_message = (
+                "Erreur: Clé API OpenAI invalide.\n\n"
+                "Votre clé API n'est pas valide ou a expiré. Veuillez:\n"
+                "1. Vérifier que vous avez copié la clé complète\n"
+                "2. Obtenir une nouvelle clé sur: https://platform.openai.com/account/api-keys\n"
+                "3. Vérifier que votre compte OpenAI a des crédits disponibles"
+            )
+    elif "RateLimitError" in error_type:
+        error_code = 429
+        user_message = (
+            "Erreur: Limite de taux dépassée.\n\n"
+            "Vous avez fait trop de requêtes. Veuillez attendre quelques instants avant de réessayer."
+        )
+    elif "APIError" in error_type or "InternalServerError" in error_type:
+        error_code = 500
+        user_message = (
+            "Erreur: Problème serveur OpenAI.\n\n"
+            "Le serveur OpenAI rencontre des difficultés. Veuillez réessayer dans quelques instants."
+        )
+    elif "APIConnectionError" in error_type or "Timeout" in error_type:
+        error_code = "connection"
+        user_message = (
+            "Erreur: Problème de connexion.\n\n"
+            "Impossible de se connecter à l'API OpenAI. Vérifiez votre connexion internet et réessayez."
+        )
     # Check for 401 (Invalid API Key)
-    if "401" in error_str or "invalid_api_key" in error_str.lower() or "Incorrect API key" in error_str:
+    elif "401" in error_str or "invalid_api_key" in error_str.lower() or "Incorrect API key" in error_str or "authentication" in error_str.lower():
         error_code = 401
         user_message = (
             "Erreur: Clé API OpenAI invalide.\n\n"
@@ -37,21 +67,21 @@ def parse_openai_error(error: Exception) -> Dict[str, Any]:
             "3. Vérifier que votre compte OpenAI a des crédits disponibles"
         )
     # Check for 429 (Rate Limit)
-    elif "429" in error_str or "rate_limit" in error_str.lower():
+    elif "429" in error_str or "rate_limit" in error_str.lower() or "rate limit" in error_str.lower():
         error_code = 429
         user_message = (
             "Erreur: Limite de taux dépassée.\n\n"
             "Vous avez fait trop de requêtes. Veuillez attendre quelques instants avant de réessayer."
         )
     # Check for 500 (Server Error)
-    elif "500" in error_str or "internal_error" in error_str.lower():
+    elif "500" in error_str or "internal_error" in error_str.lower() or "server error" in error_str.lower():
         error_code = 500
         user_message = (
             "Erreur: Problème serveur OpenAI.\n\n"
             "Le serveur OpenAI rencontre des difficultés. Veuillez réessayer dans quelques instants."
         )
     # Check for insufficient credits
-    elif "insufficient_quota" in error_str.lower() or "billing" in error_str.lower():
+    elif "insufficient_quota" in error_str.lower() or "billing" in error_str.lower() or "quota" in error_str.lower():
         error_code = "billing"
         user_message = (
             "Erreur: Crédits insuffisants.\n\n"
@@ -59,11 +89,18 @@ def parse_openai_error(error: Exception) -> Dict[str, Any]:
             "Veuillez ajouter des crédits sur: https://platform.openai.com/account/billing"
         )
     # Check for invalid model
-    elif "model" in error_str.lower() and ("not found" in error_str.lower() or "invalid" in error_str.lower()):
+    elif "model" in error_str.lower() and ("not found" in error_str.lower() or "invalid" in error_str.lower() or "does not exist" in error_str.lower()):
         error_code = "model"
         user_message = (
             "Erreur: Modèle invalide.\n\n"
             "Le modèle sélectionné n'est pas disponible. Veuillez choisir un autre modèle."
+        )
+    # Check for connection/timeout errors
+    elif "connection" in error_str.lower() or "timeout" in error_str.lower() or "network" in error_str.lower():
+        error_code = "connection"
+        user_message = (
+            "Erreur: Problème de connexion.\n\n"
+            "Impossible de se connecter à l'API OpenAI. Vérifiez votre connexion internet et réessayez."
         )
     
     return {

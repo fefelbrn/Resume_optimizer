@@ -223,6 +223,7 @@
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="optimized-cv">CV Optimisé</button>
                     <button class="tab-btn" data-tab="cover-letter">Lettre de Motivation</button>
+                    <button class="tab-btn" data-tab="assistant">Assistant</button>
                 </div>
 
                 <div class="tab-content active" id="optimized-cv-tab">
@@ -239,6 +240,41 @@
                         <button class="btn-download" data-download="cover-letter">💾 Télécharger</button>
                     </div>
                     <div class="result-content" id="cover-letter-content"></div>
+                </div>
+
+                <!-- Assistant Chat Tab -->
+                <div class="tab-content" id="assistant-tab">
+                    <div class="assistant-header">
+                        <h3>💬 Assistant Conversationnel</h3>
+                        <p class="assistant-description">Demandez des ajustements sur votre CV optimisé ou corrigez les compétences détectées</p>
+                    </div>
+                    
+                    <div class="assistant-chat-container">
+                        <div id="assistant-messages" class="assistant-messages">
+                            <div class="assistant-empty">
+                                <p>💬 Commencez par générer un CV optimisé, puis demandez des ajustements ici</p>
+                                <p class="assistant-examples">
+                                    Exemples :<br>
+                                    • "Ajoute la compétence Excel avancé"<br>
+                                    • "Corrige 'advanced exce' en 'advanced excel'"<br>
+                                    • "Ajoute une section sur mes projets Python"
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="assistant-input-container">
+                            <div class="assistant-input-wrapper">
+                                <textarea id="assistant-input" placeholder="Ex: Ajoute la compétence Excel avancé..." rows="2"></textarea>
+                                <button id="assistant-send-btn" class="btn-primary" disabled>
+                                    <span class="btn-icon">📤</span>
+                                    Envoyer
+                                </button>
+                            </div>
+                            <div class="assistant-actions">
+                                <button id="clear-assistant-btn" class="btn-secondary">🗑️ Effacer</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
             </div>
@@ -289,6 +325,44 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Quick Navigation Menu -->
+    <div id="quick-nav-menu" class="quick-nav-menu">
+        <button id="quick-nav-toggle" class="quick-nav-toggle" aria-label="Menu de navigation rapide">
+            <span class="quick-nav-icon">😄</span>
+        </button>
+        <div id="quick-nav-popup" class="quick-nav-popup hidden">
+            <div class="quick-nav-header">
+                <span>Navigation rapide</span>
+            </div>
+            <div class="quick-nav-items">
+                <button class="quick-nav-item" data-nav="config">
+                    <span class="quick-nav-item-icon">⚙️</span>
+                    <span class="quick-nav-item-text">Configuration</span>
+                </button>
+                <button class="quick-nav-item" data-nav="api-key">
+                    <span class="quick-nav-item-icon">🔑</span>
+                    <span class="quick-nav-item-text">Clé API</span>
+                </button>
+                <button class="quick-nav-item" data-nav="optimized-cv">
+                    <span class="quick-nav-item-icon">📄</span>
+                    <span class="quick-nav-item-text">CV Optimisé</span>
+                </button>
+                <button class="quick-nav-item" data-nav="cover-letter">
+                    <span class="quick-nav-item-icon">✉️</span>
+                    <span class="quick-nav-item-text">Lettre de Motivation</span>
+                </button>
+                <button class="quick-nav-item" data-nav="assistant">
+                    <span class="quick-nav-item-icon">💬</span>
+                    <span class="quick-nav-item-text">Assistant</span>
+                </button>
+                <button class="quick-nav-item" data-nav="history">
+                    <span class="quick-nav-item-icon">📚</span>
+                    <span class="quick-nav-item-text">Historique</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

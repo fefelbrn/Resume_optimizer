@@ -9,7 +9,10 @@ const state = {
     apiKey: '',
     cvSkills: [],
     jobSkills: [],
-    skillsMatched: false
+    skillsMatched: false,
+    assistantHistory: [],
+    assistantSessionId: 'default',
+    matchedSkillsData: null
 };
 
 // DOM Elements
@@ -52,147 +55,170 @@ const elements = {
     skillsTags: document.getElementById('skills-tags'),
     skillsStats: document.getElementById('skills-stats'),
     skillsLoading: document.getElementById('skills-loading'),
-    skillsEmpty: document.getElementById('skills-empty')
+    skillsEmpty: document.getElementById('skills-empty'),
+    // Assistant elements (may be null if results section is hidden)
+    assistantMessages: document.getElementById('assistant-messages'),
+    assistantInput: document.getElementById('assistant-input'),
+    assistantSendBtn: document.getElementById('assistant-send-btn'),
+    clearAssistantBtn: document.getElementById('clear-assistant-btn'),
+    // Quick navigation menu
+    quickNavToggle: document.getElementById('quick-nav-toggle'),
+    quickNavPopup: document.getElementById('quick-nav-popup'),
+    quickNavItems: document.querySelectorAll('.quick-nav-item')
 };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    setupEventListeners();
-    updateWordCounts();
-    loadHistory();
-    setupMainTabs();
+    try {
+        setupEventListeners();
+        updateWordCounts();
+        loadHistory();
+        setupMainTabs();
+        // Assistant listeners will be set up when results section is shown
+        // setupAssistantListeners(); // Commented out - will be called when needed
+        loadAssistantHistory();
+        setupQuickNavigation();
+        console.log('Application initialized successfully');
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        showError('Erreur lors de l\'initialisation de l\'application: ' + error.message);
+    }
 });
 
 // Event Listeners Setup
 function setupEventListeners() {
-    // Temperature slider
-    elements.temperatureInput.addEventListener('input', (e) => {
-        // Format to 2 decimal places
-        const value = parseFloat(e.target.value);
-        elements.tempValue.textContent = value.toFixed(2);
-    });
+    try {
+        // Temperature slider
+        if (elements.temperatureInput && elements.tempValue) {
+            elements.temperatureInput.addEventListener('input', (e) => {
+                // Format to 2 decimal places
+                const value = parseFloat(e.target.value);
+                elements.tempValue.textContent = value.toFixed(2);
+            });
+        }
 
-    // File uploads
-    elements.cvFileInput.addEventListener('change', (e) => handleFileUpload(e, 'cv'));
-    elements.jdFileInput.addEventListener('change', (e) => handleFileUpload(e, 'jd'));
+        // File uploads
+        if (elements.cvFileInput) {
+            console.log('CV file input found, attaching listener');
+            elements.cvFileInput.addEventListener('change', (e) => handleFileUpload(e, 'cv'));
+        } else {
+            console.error('CV file input NOT FOUND!');
+        }
+        if (elements.jdFileInput) {
+            console.log('JD file input found, attaching listener');
+            elements.jdFileInput.addEventListener('change', (e) => handleFileUpload(e, 'jd'));
+        } else {
+            console.error('JD file input NOT FOUND!');
+        }
+    } catch (error) {
+        console.error('Error in setupEventListeners:', error);
+    }
 
-    // Paste buttons - show textarea and paste
+    // Paste buttons - show textarea only, let user paste manually
     document.getElementById('paste-cv-btn').addEventListener('click', () => {
         // Show textarea
         elements.cvTextarea.classList.remove('hidden');
         elements.cvCount.classList.remove('hidden');
+        
+        // Clear textarea first - start fresh
+        elements.cvTextarea.value = '';
+        
+        // Focus textarea so user can paste with Ctrl+V
         elements.cvTextarea.focus();
         
         // Hide upload status when showing textarea
-        elements.cvUploadStatus.classList.add('hidden');
-        
-        // If text is already in state (from file upload), use it
-        if (state.cvText) {
-            elements.cvTextarea.value = state.cvText;
-            autoResizeTextarea(elements.cvTextarea);
-            updateWordCounts();
-            // Extract skills if not already done
-            if (state.cvSkills.length === 0) {
-                extractSkillsFromText(state.cvText, 'cv');
-            }
-        } else {
-            // Otherwise, try to paste from clipboard
-            navigator.clipboard.readText().then(text => {
-                elements.cvTextarea.value = text;
-                state.cvText = text;
-                autoResizeTextarea(elements.cvTextarea);
-                updateWordCounts();
-                // Extract skills
-                extractSkillsFromText(text, 'cv');
-            }).catch(() => {
-                // If clipboard access fails, just show the textarea
-                console.log('Clipboard access not available');
-            });
+        if (elements.cvUploadStatus) {
+            elements.cvUploadStatus.classList.add('hidden');
         }
         
-        // Check if we can match skills
-        if (state.cvText && state.jobDescription && state.cvSkills.length > 0 && state.jobSkills.length > 0) {
-            matchSkills();
-        }
+        // User will paste manually with Ctrl+V
     });
 
     document.getElementById('paste-jd-btn').addEventListener('click', () => {
         // Show textarea
         elements.jdTextarea.classList.remove('hidden');
         elements.jdCount.classList.remove('hidden');
+        
+        // Clear textarea first - start fresh
+        elements.jdTextarea.value = '';
+        
+        // Focus textarea so user can paste with Ctrl+V
         elements.jdTextarea.focus();
         
         // Hide upload status when showing textarea
-        elements.jdUploadStatus.classList.add('hidden');
-        
-        // If text is already in state (from file upload), use it
-        if (state.jobDescription) {
-            elements.jdTextarea.value = state.jobDescription;
-            autoResizeTextarea(elements.jdTextarea);
-            updateWordCounts();
-            // Extract skills if not already done
-            if (state.jobSkills.length === 0) {
-                extractSkillsFromText(state.jobDescription, 'job');
-            }
-        } else {
-            // Otherwise, try to paste from clipboard
-            navigator.clipboard.readText().then(text => {
-                elements.jdTextarea.value = text;
-                state.jobDescription = text;
-                autoResizeTextarea(elements.jdTextarea);
-                updateWordCounts();
-                // Extract skills
-                extractSkillsFromText(text, 'job');
-            }).catch(() => {
-                // If clipboard access fails, just show the textarea
-                console.log('Clipboard access not available');
-            });
+        if (elements.jdUploadStatus) {
+            elements.jdUploadStatus.classList.add('hidden');
         }
         
-        // Check if we can match skills
-        if (state.cvText && state.jobDescription && state.cvSkills.length > 0 && state.jobSkills.length > 0) {
-            matchSkills();
-        }
+        // User will paste manually with Ctrl+V
     });
 
     // Text area changes - auto-resize and word count
-    elements.cvTextarea.addEventListener('input', () => {
-        autoResizeTextarea(elements.cvTextarea);
-        updateWordCounts();
-        state.cvText = elements.cvTextarea.value;
-        // Reset CV skills when text changes manually
-        state.cvSkills = [];
-        // Debounce extraction to avoid too many API calls
-        clearTimeout(extractSkillsTimeout);
-        extractSkillsTimeout = setTimeout(() => {
+    // CV textarea - ONLY updates state.cvText
+    elements.cvTextarea.addEventListener('input', (e) => {
+        // Only update if textarea is visible (user is actively editing)
+        if (!elements.cvTextarea.classList.contains('hidden')) {
+            autoResizeTextarea(elements.cvTextarea);
+            // Update ONLY CV state, never touch job description
+            state.cvText = e.target.value;
+            updateWordCounts();
+            // Reset CV skills when text changes manually
+            state.cvSkills = [];
+            // Debounce extraction to avoid too many API calls
+            clearTimeout(extractSkillsTimeout);
+            extractSkillsTimeout = setTimeout(() => {
+                if (state.cvText.trim()) {
+                    extractSkillsFromText(state.cvText, 'cv');
+                }
+            }, 2000); // Wait 2 seconds after user stops typing
+        }
+    });
+    
+    // Job description textarea - ONLY updates state.jobDescription
+    elements.jdTextarea.addEventListener('input', (e) => {
+        // Only update if textarea is visible (user is actively editing)
+        if (!elements.jdTextarea.classList.contains('hidden')) {
+            autoResizeTextarea(elements.jdTextarea);
+            // Update ONLY job description state, never touch CV
+            state.jobDescription = e.target.value;
+            updateWordCounts();
+            // Reset job skills when text changes manually
+            state.jobSkills = [];
+            // Debounce extraction to avoid too many API calls
+            clearTimeout(extractSkillsTimeout);
+            extractSkillsTimeout = setTimeout(() => {
+                if (state.jobDescription.trim()) {
+                    extractSkillsFromText(state.jobDescription, 'job');
+                }
+            }, 2000); // Wait 2 seconds after user stops typing
+        }
+    });
+    
+    // Auto-resize on paste and update state
+    elements.cvTextarea.addEventListener('paste', () => {
+        setTimeout(() => {
+            autoResizeTextarea(elements.cvTextarea);
+            // Update state when user pastes
+            state.cvText = elements.cvTextarea.value;
+            updateWordCounts();
+            // Extract skills
             if (state.cvText.trim()) {
                 extractSkillsFromText(state.cvText, 'cv');
             }
-        }, 2000); // Wait 2 seconds after user stops typing
-    });
-    
-    elements.jdTextarea.addEventListener('input', () => {
-        autoResizeTextarea(elements.jdTextarea);
-        updateWordCounts();
-        state.jobDescription = elements.jdTextarea.value;
-        // Reset job skills when text changes manually
-        state.jobSkills = [];
-        // Debounce extraction to avoid too many API calls
-        clearTimeout(extractSkillsTimeout);
-        extractSkillsTimeout = setTimeout(() => {
-            if (state.jobDescription.trim()) {
-                extractSkillsFromText(state.jobDescription, 'job');
-            }
-        }, 2000); // Wait 2 seconds after user stops typing
-    });
-    
-    // Auto-resize on paste
-    elements.cvTextarea.addEventListener('paste', () => {
-        setTimeout(() => autoResizeTextarea(elements.cvTextarea), 10);
+        }, 10);
     });
     
     elements.jdTextarea.addEventListener('paste', () => {
-        setTimeout(() => autoResizeTextarea(elements.jdTextarea), 10);
+        setTimeout(() => {
+            autoResizeTextarea(elements.jdTextarea);
+            // Update state when user pastes
+            state.jobDescription = elements.jdTextarea.value;
+            updateWordCounts();
+            // Extract skills
+            if (state.jobDescription.trim()) {
+                extractSkillsFromText(state.jobDescription, 'job');
+            }
+        }, 10);
     });
 
     // Action buttons
@@ -504,31 +530,40 @@ window.deleteHistoryItem = deleteHistoryItem;
 
 // Update word counts
 function updateWordCounts() {
-    const cvWords = elements.cvTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
-    const jdWords = elements.jdTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
-    
-    elements.cvCount.textContent = `${cvWords} mots`;
-    elements.jdCount.textContent = `${jdWords} mots`;
-    
-    state.cvText = elements.cvTextarea.value;
-    state.jobDescription = elements.jdTextarea.value;
+    // Only update counts for visible textareas using their actual content
+    if (elements.cvCount && elements.cvTextarea && !elements.cvTextarea.classList.contains('hidden')) {
+        const cvWords = elements.cvTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+        elements.cvCount.textContent = `${cvWords} mots`;
+    }
+    if (elements.jdCount && elements.jdTextarea && !elements.jdTextarea.classList.contains('hidden')) {
+        const jdWords = elements.jdTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+        elements.jdCount.textContent = `${jdWords} mots`;
+    }
 }
 
 // Handle file upload
 async function handleFileUpload(event, type) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    showLoading('Extraction du texte...');
-
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
+        const file = event.target.files[0];
+        if (!file) {
+            console.log('No file selected');
+            return;
+        }
+
+        console.log(`Uploading ${type} file:`, file.name);
+        showLoading('Extraction du texte...');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
         const response = await fetch('/api/parse-pdf', {
             method: 'POST',
             body: formData
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
         const data = await response.json();
 
@@ -537,18 +572,39 @@ async function handleFileUpload(event, type) {
             return;
         }
 
+        if (!data.text || !data.text.trim()) {
+            showError('Le fichier est vide ou n\'a pas pu être extrait');
+            return;
+        }
+
+        console.log(`File uploaded successfully, ${data.word_count} words extracted`);
+
         if (type === 'cv') {
-            // Store text in state but don't display textarea
+            // Store text in state ONLY - do NOT touch textarea
             state.cvText = data.text;
+            console.log('CV text stored, length:', state.cvText.length);
             // Show success status indicator
-            elements.cvUploadStatus.classList.remove('hidden');
+            if (elements.cvUploadStatus) {
+                elements.cvUploadStatus.classList.remove('hidden');
+            }
+            // Keep textarea hidden and empty - user can paste manually if needed
+            if (elements.cvTextarea && elements.cvTextarea.classList.contains('hidden')) {
+                // Don't touch it - it stays hidden
+            }
             // Extract skills automatically
             extractSkillsFromText(data.text, 'cv');
         } else {
-            // Store text in state but don't display textarea
+            // Store text in state ONLY - do NOT touch textarea
             state.jobDescription = data.text;
+            console.log('Job description stored, length:', state.jobDescription.length);
             // Show success status indicator
-            elements.jdUploadStatus.classList.remove('hidden');
+            if (elements.jdUploadStatus) {
+                elements.jdUploadStatus.classList.remove('hidden');
+            }
+            // Keep textarea hidden and empty - user can paste manually if needed
+            if (elements.jdTextarea && elements.jdTextarea.classList.contains('hidden')) {
+                // Don't touch it - it stays hidden
+            }
             // Extract skills automatically
             extractSkillsFromText(data.text, 'job');
         }
@@ -558,6 +614,7 @@ async function handleFileUpload(event, type) {
             matchSkills();
         }
     } catch (error) {
+        console.error('Error in handleFileUpload:', error);
         showError(`Erreur lors de l'upload: ${error.message}`);
     } finally {
         hideLoading();
@@ -603,6 +660,22 @@ async function optimizeCv() {
         elements.optimizedCvContent.textContent = data.optimized_cv;
         elements.resultsSection.classList.remove('hidden');
         switchTab('optimized-cv');
+        
+        // Re-initialize assistant elements now that results section is visible
+        if (!elements.assistantSendBtn) {
+            elements.assistantMessages = document.getElementById('assistant-messages');
+            elements.assistantInput = document.getElementById('assistant-input');
+            elements.assistantSendBtn = document.getElementById('assistant-send-btn');
+            elements.clearAssistantBtn = document.getElementById('clear-assistant-btn');
+            setupAssistantListeners();
+            // Initialize textarea height
+            if (elements.assistantInput) {
+                autoResizeTextarea(elements.assistantInput);
+            }
+        }
+        
+        // Enable assistant button
+        updateAssistantSendButton();
         
         // Save to history
         saveToHistory('cv', data.optimized_cv, {
@@ -720,6 +793,28 @@ function switchTab(tabName) {
             content.classList.remove('active');
         }
     });
+    
+    // If switching to assistant tab, initialize assistant elements if needed
+    if (tabName === 'assistant') {
+        // Always re-initialize elements when switching to assistant tab
+        elements.assistantMessages = document.getElementById('assistant-messages');
+        elements.assistantInput = document.getElementById('assistant-input');
+        elements.assistantSendBtn = document.getElementById('assistant-send-btn');
+        elements.clearAssistantBtn = document.getElementById('clear-assistant-btn');
+        
+        if (elements.assistantSendBtn && elements.assistantInput && elements.clearAssistantBtn) {
+            // Only setup listeners if not already set up
+            if (!elements.assistantSendBtn.hasAttribute('data-listeners-setup')) {
+                setupAssistantListeners();
+                elements.assistantSendBtn.setAttribute('data-listeners-setup', 'true');
+            }
+        }
+        
+        // Update button state after a short delay to ensure elements are ready
+        setTimeout(() => {
+            updateAssistantSendButton();
+        }, 100);
+    }
 }
 
 // Copy to clipboard
@@ -750,42 +845,85 @@ async function copyToClipboard(type) {
 }
 
 // Download content
-function downloadContent(type) {
-    let text = '';
-    let filename = '';
-
+async function downloadContent(type) {
     if (type === 'optimized-cv') {
-        text = state.optimizedCv;
-        filename = 'cv_optimise.txt';
+        if (!state.optimizedCv) {
+            showError('Aucun CV optimisé à télécharger');
+            return;
+        }
+        
+        // Generate PDF instead of TXT
+        try {
+            const response = await fetch('/api/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    cv_text: state.optimizedCv
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Erreur lors de la génération du PDF');
+            }
+            
+            // Download PDF
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'cv_optimise.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            showError('Erreur lors de la génération du PDF: ' + error.message);
+            // Fallback to TXT if PDF generation fails
+            const blob = new Blob([state.optimizedCv], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'cv_optimise.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
     } else if (type === 'cover-letter') {
-        text = state.coverLetter;
-        filename = 'lettre_motivation.txt';
+        const text = state.coverLetter;
+        if (!text) {
+            showError('Aucune lettre de motivation à télécharger');
+            return;
+        }
+        
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'lettre_motivation.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
-
-    if (!text) {
-        showError('Aucun contenu à télécharger');
-        return;
-    }
-
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 // Auto-resize textarea
 function autoResizeTextarea(textarea) {
+    if (!textarea) return;
+    
     // Reset height to get accurate scrollHeight
     textarea.style.height = 'auto';
     
-    // Set new height based on content, with min and max constraints
-    const minHeight = 150;
-    const maxHeight = 800;
+    // Different min/max heights for assistant textarea vs regular textareas
+    const isAssistant = textarea.id === 'assistant-input';
+    const minHeight = isAssistant ? 60 : 150;
+    const maxHeight = isAssistant ? 300 : 800;
+    
     const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
     
     textarea.style.height = newHeight + 'px';
@@ -913,6 +1051,7 @@ async function matchSkills() {
         // Display matched skills
         displaySkills(data);
         state.skillsMatched = true;
+        state.matchedSkillsData = data; // Store for assistant context
     } catch (error) {
         console.error('Error matching skills:', error);
         elements.skillsLoading.classList.add('hidden');
@@ -983,3 +1122,490 @@ function displaySkills(matchData) {
     elements.skillsTags.innerHTML = tagsHTML || '<p style="color: var(--text-secondary);">Aucune compétence à afficher</p>';
 }
 
+// ==================== ASSISTANT FUNCTIONALITY ====================
+
+// Setup assistant event listeners
+function setupAssistantListeners() {
+    // Check if assistant elements exist (they're in the results section which may be hidden)
+    if (!elements.assistantSendBtn || !elements.assistantInput || !elements.clearAssistantBtn) {
+        return; // Elements not available yet, will be set up when results section is shown
+    }
+    
+    // Send button
+    elements.assistantSendBtn.addEventListener('click', sendAssistantRequest);
+    
+    // Enter key to send (Shift+Enter for new line)
+    elements.assistantInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (elements.assistantSendBtn && !elements.assistantSendBtn.disabled) {
+                sendAssistantRequest();
+            }
+        }
+    });
+    
+    // Enable/disable send button based on input and CV
+    // Auto-resize textarea as user types
+    elements.assistantInput.addEventListener('input', () => {
+        autoResizeTextarea(elements.assistantInput);
+        updateAssistantSendButton();
+    });
+    
+    // Auto-resize on paste
+    elements.assistantInput.addEventListener('paste', () => {
+        setTimeout(() => autoResizeTextarea(elements.assistantInput), 10);
+    });
+    
+    // Clear assistant
+    elements.clearAssistantBtn.addEventListener('click', clearAssistantHistory);
+}
+
+// Send assistant request
+async function sendAssistantRequest() {
+    if (!elements.assistantInput) {
+        showError('Éléments assistant non disponibles');
+        return;
+    }
+    
+    const request = elements.assistantInput.value.trim();
+    
+    if (!request) return;
+    
+    // Use optimized CV if available, otherwise use original CV
+    const cvToUse = state.optimizedCv || state.cvText;
+    if (!cvToUse || !cvToUse.trim()) {
+        showError('Veuillez d\'abord charger votre CV');
+        return;
+    }
+    if (!elements.apiKeyInput.value.trim()) {
+        showError('Veuillez entrer votre clé API OpenAI');
+        return;
+    }
+    
+    // Add user message to UI
+    addAssistantMessage('user', request);
+    
+    // Clear input
+    elements.assistantInput.value = '';
+    updateAssistantSendButton();
+    
+    // Show loading
+    const loadingId = addAssistantMessage('assistant', '...', true);
+    
+    try {
+        const response = await fetch('/api/assistant', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                request: request,
+                session_id: state.assistantSessionId,
+                api_key: elements.apiKeyInput.value,
+                model: elements.modelSelect.value,
+                temperature: parseFloat(elements.temperatureInput.value),
+                language: elements.languageSelect.value,
+                original_cv: state.cvText,
+                optimized_cv: state.optimizedCv || state.cvText, // Use original if no optimized
+                job_description: state.jobDescription,
+                cv_skills: state.cvSkills,
+                job_skills: state.jobSkills,
+                matched_skills: state.matchedSkillsData || {}
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remove loading message
+        removeAssistantMessage(loadingId);
+        
+        if (data.error) {
+            // Format error message with line breaks
+            let errorMsg = data.error;
+            // Replace \n with <br> for HTML display
+            errorMsg = errorMsg.replace(/\n/g, '<br>');
+            showError(data.error);
+            // Add error message with HTML support
+            addAssistantMessageHTML('assistant', `❌ ${errorMsg}`, false);
+            return;
+        }
+        
+        // Process the response
+        if (data.success) {
+            let responseText = data.explanation || 'Modification effectuée';
+            
+            // Update CV if needed
+            if (data.action === 'update_cv' || data.action === 'update_both') {
+                state.optimizedCv = data.updated_cv;
+                elements.optimizedCvContent.textContent = data.updated_cv;
+                responseText += '\n\n✅ CV optimisé mis à jour';
+            }
+            
+            // Update skills if needed
+            if (data.action === 'update_skills' || data.action === 'update_both') {
+                const updatedSkills = data.updated_skills || {};
+                if (updatedSkills.cv_skills) {
+                    state.cvSkills = updatedSkills.cv_skills;
+                }
+                if (updatedSkills.job_skills) {
+                    state.jobSkills = updatedSkills.job_skills;
+                }
+                // Re-match skills if both are updated
+                if (state.cvSkills.length > 0 && state.jobSkills.length > 0) {
+                    matchSkills();
+                }
+                responseText += '\n\n✅ Compétences mises à jour';
+            }
+            
+            // Add assistant response
+            addAssistantMessage('assistant', responseText, false);
+            
+            // Save to history
+            state.assistantHistory.push({
+                request: request,
+                response: data
+            });
+            saveAssistantHistory();
+        } else {
+            addAssistantMessage('assistant', `Erreur: ${data.error || 'Modification échouée'}`, false);
+        }
+        
+    } catch (error) {
+        removeAssistantMessage(loadingId);
+        showError(`Erreur lors de l'envoi: ${error.message}`);
+        addAssistantMessage('assistant', `Erreur: ${error.message}`, false);
+    }
+}
+
+// Add assistant message to UI
+function addAssistantMessage(role, content, isLoading = false) {
+    if (!elements.assistantMessages) {
+        console.error('Assistant messages container not found');
+        return null;
+    }
+    
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Remove empty state if exists
+    const emptyState = elements.assistantMessages.querySelector('.assistant-empty');
+    if (emptyState) {
+        emptyState.remove();
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `assistant-message assistant-message-${role}`;
+    messageDiv.id = messageId;
+    
+    if (isLoading) {
+        messageDiv.innerHTML = `
+            <div class="assistant-message-content">
+                <div class="spinner-small"></div>
+                <span>Traitement en cours...</span>
+            </div>
+        `;
+    } else {
+        messageDiv.innerHTML = `
+            <div class="assistant-message-content">
+                <div class="assistant-text">${escapeHtml(content).replace(/\n/g, '<br>')}</div>
+            </div>
+        `;
+    }
+    
+    elements.assistantMessages.appendChild(messageDiv);
+    elements.assistantMessages.scrollTop = elements.assistantMessages.scrollHeight;
+    
+    return messageId;
+}
+
+// Add assistant message with HTML support (for error messages)
+function addAssistantMessageHTML(role, content, isLoading = false) {
+    if (!elements.assistantMessages) {
+        console.error('Assistant messages container not found');
+        return null;
+    }
+    
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Remove empty state if exists
+    const emptyState = elements.assistantMessages.querySelector('.assistant-empty');
+    if (emptyState) {
+        emptyState.remove();
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `assistant-message assistant-message-${role}`;
+    messageDiv.id = messageId;
+    
+    if (isLoading) {
+        messageDiv.innerHTML = `
+            <div class="assistant-message-content">
+                <div class="spinner-small"></div>
+                <span>Traitement en cours...</span>
+            </div>
+        `;
+    } else {
+        messageDiv.innerHTML = `
+            <div class="assistant-message-content">
+                <div class="assistant-text">${content}</div>
+            </div>
+        `;
+    }
+    
+    elements.assistantMessages.appendChild(messageDiv);
+    elements.assistantMessages.scrollTop = elements.assistantMessages.scrollHeight;
+    
+    return messageId;
+}
+
+// Remove assistant message
+function removeAssistantMessage(messageId) {
+    const message = document.getElementById(messageId);
+    if (message) {
+        message.remove();
+    }
+}
+
+// Clear assistant messages UI
+function clearAssistantMessages() {
+    if (!elements.assistantMessages) {
+        return;
+    }
+    elements.assistantMessages.innerHTML = `
+        <div class="assistant-empty">
+            <p>💬 Commencez par générer un CV optimisé, puis demandez des ajustements ici</p>
+            <p class="assistant-examples">
+                Exemples :<br>
+                • "Ajoute la compétence Excel avancé"<br>
+                • "Corrige 'advanced exce' en 'advanced excel'"<br>
+                • "Ajoute une section sur mes projets Python"
+            </p>
+        </div>
+    `;
+}
+
+// Update assistant send button state
+function updateAssistantSendButton() {
+    if (!elements.assistantSendBtn || !elements.assistantInput) {
+        console.log('Assistant elements not found:', {
+            sendBtn: !!elements.assistantSendBtn,
+            input: !!elements.assistantInput
+        });
+        return; // Elements not available
+    }
+    const hasInput = elements.assistantInput.value.trim().length > 0;
+    // Allow using assistant with either optimized CV or original CV
+    const hasCv = (state.optimizedCv && state.optimizedCv.trim().length > 0) || 
+                  (state.cvText && state.cvText.trim().length > 0);
+    const shouldEnable = hasInput && hasCv;
+    
+    console.log('Assistant button state:', {
+        hasInput,
+        hasCv,
+        optimizedCvLength: state.optimizedCv ? state.optimizedCv.length : 0,
+        cvTextLength: state.cvText ? state.cvText.length : 0,
+        shouldEnable,
+        currentDisabled: elements.assistantSendBtn.disabled
+    });
+    
+    elements.assistantSendBtn.disabled = !shouldEnable;
+}
+
+// Clear assistant history
+async function clearAssistantHistory() {
+    if (!confirm('Êtes-vous sûr de vouloir effacer toute la conversation ?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/assistant-history', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                session_id: state.assistantSessionId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            showError(data.error);
+            return;
+        }
+        
+        // Clear local state
+        state.assistantHistory = [];
+        clearAssistantMessages();
+        saveAssistantHistory();
+        
+    } catch (error) {
+        showError(`Erreur lors de l'effacement: ${error.message}`);
+    }
+}
+
+// Load assistant history from localStorage
+function loadAssistantHistory() {
+    try {
+        const saved = localStorage.getItem('assistantHistory');
+        if (saved) {
+            state.assistantHistory = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('Error loading assistant history:', error);
+    }
+}
+
+// Save assistant history to localStorage
+function saveAssistantHistory() {
+    try {
+        localStorage.setItem('assistantHistory', JSON.stringify(state.assistantHistory));
+    } catch (error) {
+        console.error('Error saving assistant history:', error);
+    }
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Quick Navigation Menu
+function setupQuickNavigation() {
+    if (!elements.quickNavToggle || !elements.quickNavPopup) {
+        console.warn('Quick navigation elements not found');
+        return;
+    }
+
+    // Toggle popup on button click
+    elements.quickNavToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        elements.quickNavPopup.classList.toggle('hidden');
+    });
+
+    // Handle navigation item clicks
+    elements.quickNavItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const navTarget = item.dataset.nav;
+            navigateTo(navTarget);
+            // Close popup after navigation
+            elements.quickNavPopup.classList.add('hidden');
+        });
+    });
+
+    // Close popup when clicking outside
+    document.addEventListener('click', (e) => {
+        const quickNavMenu = document.getElementById('quick-nav-menu');
+        if (quickNavMenu && !quickNavMenu.contains(e.target)) {
+            elements.quickNavPopup.classList.add('hidden');
+        }
+    });
+
+    // Close popup on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !elements.quickNavPopup.classList.contains('hidden')) {
+            elements.quickNavPopup.classList.add('hidden');
+        }
+    });
+}
+
+// Navigate to a specific section
+function navigateTo(target) {
+    switch (target) {
+        case 'config':
+            // Switch to generation tab and scroll to config section
+            switchMainTab('generation');
+            setTimeout(() => {
+                const configSection = document.querySelector('.config-section');
+                if (configSection) {
+                    configSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+            break;
+
+        case 'api-key':
+            // Switch to generation tab and focus on API key input
+            switchMainTab('generation');
+            setTimeout(() => {
+                const apiKeyInput = document.getElementById('api-key');
+                if (apiKeyInput) {
+                    apiKeyInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    apiKeyInput.focus();
+                }
+            }, 100);
+            break;
+
+        case 'optimized-cv':
+            // Switch to generation tab and open CV optimized tab
+            switchMainTab('generation');
+            setTimeout(() => {
+                switchTab('optimized-cv');
+                const resultsSection = document.getElementById('results-section');
+                if (resultsSection) {
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+            break;
+
+        case 'cover-letter':
+            // Switch to generation tab and open cover letter tab
+            switchMainTab('generation');
+            setTimeout(() => {
+                switchTab('cover-letter');
+                const resultsSection = document.getElementById('results-section');
+                if (resultsSection) {
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+            break;
+
+        case 'assistant':
+            // Switch to generation tab and open assistant tab
+            switchMainTab('generation');
+            setTimeout(() => {
+                switchTab('assistant');
+                const resultsSection = document.getElementById('results-section');
+                if (resultsSection) {
+                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+            break;
+
+        case 'history':
+            // Switch to history tab
+            switchMainTab('history');
+            break;
+
+        default:
+            console.warn('Unknown navigation target:', target);
+    }
+}
+
+// Helper function to switch main tabs
+function switchMainTab(tabName) {
+    // Update tab buttons
+    elements.mainTabs.forEach(tab => {
+        if (tab.dataset.mainTab === tabName) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+
+    // Update tab contents
+    elements.mainTabContents.forEach(content => {
+        if (content.id === `${tabName}-content`) {
+            content.classList.add('active');
+        } else {
+            content.classList.remove('active');
+        }
+    });
+
+    // Reload history when switching to history tab
+    if (tabName === 'history') {
+        loadHistory();
+    }
+}

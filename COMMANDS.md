@@ -1,16 +1,44 @@
+For fefe
+
+cd "/Users/fefe/Desktop/Cours M1 Albert/Semestre 1/Agentic systems/Projet/Resume optimizer/Resume Optimizer" && python app.py
+
+
+
+
+
+
+
+
 # Commands Guide - CV Optimizer
 
-Quick reference for local development commands.
+## 🚀 Quick Start
 
-## Installation
-
-### 1. Check Python version
+### Installation (une seule fois)
 ```bash
-python --version
-# Should display Python 3.8 or higher
+pip install -r requirements.txt
+mkdir uploads
 ```
 
-### 2. Create virtual environment (recommended)
+### Lancer l'application
+```bash
+python app.py
+```
+
+Puis ouvrez : **http://127.0.0.1:5000**
+
+---
+
+## 📚 Guide Complet
+
+### Installation détaillée
+
+#### 1. Vérifier la version Python
+```bash
+python --version
+# Doit afficher Python 3.8 ou supérieur
+```
+
+#### 2. Créer un environnement virtuel (recommandé)
 
 **macOS/Linux:**
 ```bash
@@ -24,30 +52,30 @@ python -m venv .venv
 .venv\Scripts\activate
 ```
 
-### 3. Install dependencies
+#### 3. Installer les dépendances
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Create uploads folder
+#### 4. Créer le dossier uploads
 ```bash
 mkdir uploads
 ```
 
-## Launch
+### Méthodes de lancement
 
-### Method 1: Direct Python command
+#### Méthode 1: Commande Python directe
 ```bash
 python app.py
 ```
 
-### Method 2: Using the script (macOS/Linux)
+#### Méthode 2: Script (macOS/Linux)
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
-### Method 3: Using Flask CLI
+#### Méthode 3: Flask CLI
 ```bash
 export FLASK_APP=app.py
 flask run
@@ -57,16 +85,6 @@ flask run
 ```bash
 set FLASK_APP=app.py
 flask run
-```
-
-### Access the application
-Open your browser and go to:
-```
-http://127.0.0.1:5000
-```
-or
-```
-http://localhost:5000
 ```
 
 ## Development

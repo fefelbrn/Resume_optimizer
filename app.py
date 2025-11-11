@@ -1,13 +1,15 @@
 """
 Flask Backend for CV Optimizer and Cover Letter Generator
 """
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import os
 from utils.pdf_parser import extract_text_from_pdf
 from utils.cv_optimizer import optimize_cv
 from utils.letter_generator import generate_cover_letter
 from utils.skills_matcher import extract_skills, match_skills
+from utils.assistant import process_assistant_request
+from utils.pdf_generator import generate_harvard_pdf
 import traceback
 
 app = Flask(__name__)
@@ -19,6 +21,9 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_EXTENSIONS = {'pdf', 'txt'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# In-memory storage for assistant conversation history
+assistant_history = {}  # {session_id: [messages]}
 
 
 def allowed_file(filename):
@@ -219,6 +224,142 @@ def api_match_skills():
         )
         
         return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/assistant', methods=['POST'])
+def api_assistant():
+    """API endpoint for conversational assistant to adjust CV and skills"""
+    try:
+        data = request.json
+        
+        user_request = data.get('request', '')
+        session_id = data.get('session_id', 'default')
+        api_key = data.get('api_key', '')
+        model = data.get('model', 'gpt-4o-mini')
+        temperature = float(data.get('temperature', 0.7))
+        language = data.get('language', 'fr')
+        
+        # Context data
+        original_cv = data.get('original_cv', '')
+        optimized_cv = data.get('optimized_cv', '')
+        job_description = data.get('job_description', '')
+        cv_skills = data.get('cv_skills', [])
+        job_skills = data.get('job_skills', [])
+        matched_skills = data.get('matched_skills', {})
+        
+        if not api_key:
+            return jsonify({'error': 'API key is required'}), 400
+        
+        if not user_request:
+            return jsonify({'error': 'Request is required'}), 400
+        
+        if not optimized_cv:
+            return jsonify({'error': 'Please generate an optimized CV first'}), 400
+        
+        # Process assistant request
+        result = process_assistant_request(
+            user_request=user_request,
+            original_cv=original_cv,
+            optimized_cv=optimized_cv,
+            job_description=job_description,
+            cv_skills=cv_skills,
+            job_skills=job_skills,
+            matched_skills=matched_skills,
+            api_key=api_key,
+            model=model,
+            temperature=temperature,
+            language=language
+        )
+        
+        if 'error' in result:
+            error_response = {'error': result['error']}
+            if 'error_code' in result:
+                error_response['error_code'] = result['error_code']
+            return jsonify(error_response), 500
+        
+        # Store in history
+        if session_id not in assistant_history:
+            assistant_history[session_id] = []
+        
+        message = {
+            'id': f"{session_id}_{len(assistant_history[session_id])}",
+            'request': user_request,
+            'response': result,
+            'timestamp': str(os.urandom(8).hex())
+        }
+        
+        assistant_history[session_id].append(message)
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        error_msg = str(e)
+        # Try to parse OpenAI errors
+        try:
+            from utils.cv_optimizer import parse_openai_error
+            parsed = parse_openai_error(e)
+            error_msg = parsed.get('user_message', error_msg)
+        except:
+            pass
+        return jsonify({'error': error_msg, 'traceback': traceback.format_exc()}), 500
+
+
+@app.route('/api/assistant-history', methods=['GET'])
+def api_get_assistant_history():
+    """API endpoint to get assistant conversation history"""
+    try:
+        session_id = request.args.get('session_id', 'default')
+        
+        if session_id not in assistant_history:
+            return jsonify({'history': []})
+        
+        return jsonify({'history': assistant_history[session_id]})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/assistant-history', methods=['DELETE'])
+def api_clear_assistant_history():
+    """API endpoint to clear assistant history"""
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+        
+        if session_id in assistant_history:
+            assistant_history[session_id] = []
+        
+        return jsonify({'success': True, 'message': 'Assistant history cleared'})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/generate-pdf', methods=['POST'])
+def api_generate_pdf():
+    """API endpoint to generate PDF CV with Harvard template"""
+    try:
+        data = request.json
+        cv_text = data.get('cv_text', '')
+        
+        if not cv_text:
+            return jsonify({'error': 'CV text is required'}), 400
+        
+        # Generate PDF
+        pdf_buffer = generate_harvard_pdf(cv_text)
+        
+        # Return PDF file
+        from flask import Response
+        return Response(
+            pdf_buffer.getvalue(),
+            mimetype='application/pdf',
+            headers={
+                'Content-Disposition': 'attachment; filename=cv_optimise.pdf'
+            }
+        )
     
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
