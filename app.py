@@ -357,7 +357,7 @@ def api_generate_pdf():
             pdf_buffer.getvalue(),
             mimetype='application/pdf',
             headers={
-                'Content-Disposition': 'attachment; filename=cv_optimise.pdf'
+                'Content-Disposition': 'attachment; filename=optimized_cv.pdf'
             }
         )
     

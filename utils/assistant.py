@@ -96,21 +96,21 @@ The JSON should have this structure:
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_message),
-        ("human", """CV Original:
+        ("human", """Original CV:
 {original_cv}
 
-CV Optimisé Actuel:
+Current Optimized CV:
 {optimized_cv}
 
-Description du Poste:
+Job Description:
 {job_description}
 
-Compétences Détectées:
+Detected Skills:
 {skills_context}
 
-Demande de l'utilisateur: {user_request}
+User Request: {user_request}
 
-Analysez la demande et effectuez les modifications demandées. Répondez UNIQUEMENT avec un JSON valide selon le format indiqué.""")
+Analyze the request and make the requested changes. Respond ONLY with valid JSON according to the specified format.""")
     ])
     
     chain = prompt | llm

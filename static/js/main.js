@@ -70,10 +70,10 @@ const elements = {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        setupEventListeners();
-        updateWordCounts();
-        loadHistory();
-        setupMainTabs();
+    setupEventListeners();
+    updateWordCounts();
+    loadHistory();
+    setupMainTabs();
         // Assistant listeners will be set up when results section is shown
         // setupAssistantListeners(); // Commented out - will be called when needed
         loadAssistantHistory();
@@ -81,32 +81,32 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Application initialized successfully');
     } catch (error) {
         console.error('Error during initialization:', error);
-        showError('Erreur lors de l\'initialisation de l\'application: ' + error.message);
+        showError('Error during application initialization: ' + error.message);
     }
 });
 
 // Event Listeners Setup
 function setupEventListeners() {
     try {
-        // Temperature slider
+    // Temperature slider
         if (elements.temperatureInput && elements.tempValue) {
-            elements.temperatureInput.addEventListener('input', (e) => {
-                // Format to 2 decimal places
-                const value = parseFloat(e.target.value);
-                elements.tempValue.textContent = value.toFixed(2);
-            });
+    elements.temperatureInput.addEventListener('input', (e) => {
+        // Format to 2 decimal places
+        const value = parseFloat(e.target.value);
+        elements.tempValue.textContent = value.toFixed(2);
+    });
         }
 
-        // File uploads
+    // File uploads
         if (elements.cvFileInput) {
             console.log('CV file input found, attaching listener');
-            elements.cvFileInput.addEventListener('change', (e) => handleFileUpload(e, 'cv'));
+    elements.cvFileInput.addEventListener('change', (e) => handleFileUpload(e, 'cv'));
         } else {
             console.error('CV file input NOT FOUND!');
         }
         if (elements.jdFileInput) {
             console.log('JD file input found, attaching listener');
-            elements.jdFileInput.addEventListener('change', (e) => handleFileUpload(e, 'jd'));
+    elements.jdFileInput.addEventListener('change', (e) => handleFileUpload(e, 'jd'));
         } else {
             console.error('JD file input NOT FOUND!');
         }
@@ -128,7 +128,7 @@ function setupEventListeners() {
         
         // Hide upload status when showing textarea
         if (elements.cvUploadStatus) {
-            elements.cvUploadStatus.classList.add('hidden');
+        elements.cvUploadStatus.classList.add('hidden');
         }
         
         // User will paste manually with Ctrl+V
@@ -147,7 +147,7 @@ function setupEventListeners() {
         
         // Hide upload status when showing textarea
         if (elements.jdUploadStatus) {
-            elements.jdUploadStatus.classList.add('hidden');
+        elements.jdUploadStatus.classList.add('hidden');
         }
         
         // User will paste manually with Ctrl+V
@@ -158,19 +158,19 @@ function setupEventListeners() {
     elements.cvTextarea.addEventListener('input', (e) => {
         // Only update if textarea is visible (user is actively editing)
         if (!elements.cvTextarea.classList.contains('hidden')) {
-            autoResizeTextarea(elements.cvTextarea);
+        autoResizeTextarea(elements.cvTextarea);
             // Update ONLY CV state, never touch job description
             state.cvText = e.target.value;
-            updateWordCounts();
-            // Reset CV skills when text changes manually
-            state.cvSkills = [];
-            // Debounce extraction to avoid too many API calls
-            clearTimeout(extractSkillsTimeout);
-            extractSkillsTimeout = setTimeout(() => {
-                if (state.cvText.trim()) {
-                    extractSkillsFromText(state.cvText, 'cv');
-                }
-            }, 2000); // Wait 2 seconds after user stops typing
+        updateWordCounts();
+        // Reset CV skills when text changes manually
+        state.cvSkills = [];
+        // Debounce extraction to avoid too many API calls
+        clearTimeout(extractSkillsTimeout);
+        extractSkillsTimeout = setTimeout(() => {
+            if (state.cvText.trim()) {
+                extractSkillsFromText(state.cvText, 'cv');
+            }
+        }, 2000); // Wait 2 seconds after user stops typing
         }
     });
     
@@ -178,19 +178,19 @@ function setupEventListeners() {
     elements.jdTextarea.addEventListener('input', (e) => {
         // Only update if textarea is visible (user is actively editing)
         if (!elements.jdTextarea.classList.contains('hidden')) {
-            autoResizeTextarea(elements.jdTextarea);
+        autoResizeTextarea(elements.jdTextarea);
             // Update ONLY job description state, never touch CV
             state.jobDescription = e.target.value;
-            updateWordCounts();
-            // Reset job skills when text changes manually
-            state.jobSkills = [];
-            // Debounce extraction to avoid too many API calls
-            clearTimeout(extractSkillsTimeout);
-            extractSkillsTimeout = setTimeout(() => {
-                if (state.jobDescription.trim()) {
-                    extractSkillsFromText(state.jobDescription, 'job');
-                }
-            }, 2000); // Wait 2 seconds after user stops typing
+        updateWordCounts();
+        // Reset job skills when text changes manually
+        state.jobSkills = [];
+        // Debounce extraction to avoid too many API calls
+        clearTimeout(extractSkillsTimeout);
+        extractSkillsTimeout = setTimeout(() => {
+            if (state.jobDescription.trim()) {
+                extractSkillsFromText(state.jobDescription, 'job');
+            }
+        }, 2000); // Wait 2 seconds after user stops typing
         }
     });
     
@@ -362,8 +362,8 @@ function loadHistory(filter = null) {
     if (history.length === 0) {
         elements.historyList.innerHTML = `
             <div class="history-empty">
-                <p>📭 Aucun historique pour le moment</p>
-                <p class="history-empty-subtitle">Vos générations apparaîtront ici après utilisation de la section Génération</p>
+                <p>📭 No history yet</p>
+                <p class="history-empty-subtitle">Your generations will appear here after using the Generation section</p>
             </div>
         `;
         return;
@@ -376,7 +376,7 @@ function loadHistory(filter = null) {
     if (filtered.length === 0) {
         elements.historyList.innerHTML = `
             <div class="history-empty">
-                <p>📭 Aucun élément dans cette catégorie</p>
+                <p>📭 No items in this category</p>
             </div>
         `;
         return;
@@ -392,7 +392,7 @@ function loadHistory(filter = null) {
             minute: '2-digit'
         });
         
-        const typeLabel = item.type === 'cv' ? 'CV Optimisé' : 'Lettre de Motivation';
+        const typeLabel = item.type === 'cv' ? 'Optimized CV' : 'Cover Letter';
         const typeClass = item.type === 'cv' ? 'cv' : 'letter';
         const preview = item.content.substring(0, 200) + (item.content.length > 200 ? '...' : '');
         
@@ -408,21 +408,21 @@ function loadHistory(filter = null) {
                     <span>🌐 ${item.metadata.language?.toUpperCase() || 'FR'}</span>
                     <span>🤖 ${item.metadata.model || 'gpt-4o-mini'}</span>
                     <span>🌡️ ${item.metadata.temperature || 0.3}</span>
-                    ${item.metadata.target_words ? `<span>📝 ${item.metadata.target_words} mots</span>` : ''}
+                    ${item.metadata.target_words ? `<span>📝 ${item.metadata.target_words} words</span>` : ''}
                 </div>
                 <div class="history-item-content">${escapeHtml(preview)}</div>
                 <div class="history-item-actions">
                     <button class="history-btn" onclick="loadHistoryItem(${item.id})">
-                        🔄 Recharger
+                        🔄 Reload
                     </button>
                     <button class="history-btn secondary" onclick="copyHistoryItem(${item.id})">
-                        📋 Copier
+                        📋 Copy
                     </button>
                     <button class="history-btn secondary" onclick="downloadHistoryItem(${item.id})">
-                        💾 Télécharger
+                        💾 Download
                     </button>
                     <button class="history-btn" onclick="deleteHistoryItem(${item.id})" style="background: var(--error-color); color: white; border-color: var(--error-color);">
-                        🗑️ Supprimer
+                        🗑️ Delete
                     </button>
                 </div>
             </div>
@@ -435,7 +435,7 @@ function filterHistory(filter) {
 }
 
 function clearHistory() {
-    if (confirm('Êtes-vous sûr de vouloir effacer tout l\'historique ?')) {
+    if (confirm('Are you sure you want to clear all history?')) {
         localStorage.removeItem(HISTORY_STORAGE_KEY);
         loadHistory();
     }
@@ -481,12 +481,12 @@ function copyHistoryItem(id) {
     if (!item) return;
     
     navigator.clipboard.writeText(item.content).then(() => {
-        showError('✓ Contenu copié dans le presse-papier !');
+        showError('✓ Content copied to clipboard!');
         setTimeout(() => {
             elements.errorModal.classList.add('hidden');
         }, 2000);
     }).catch(() => {
-        showError('Erreur lors de la copie');
+        showError('Error during copy');
     });
 }
 
@@ -495,7 +495,7 @@ function downloadHistoryItem(id) {
     const item = history.find(h => h.id === id);
     if (!item) return;
     
-    const filename = item.type === 'cv' ? 'cv_optimise.txt' : 'lettre_motivation.txt';
+    const filename = item.type === 'cv' ? 'optimized_cv.txt' : 'cover_letter.txt';
     const blob = new Blob([item.content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -508,7 +508,7 @@ function downloadHistoryItem(id) {
 }
 
 function deleteHistoryItem(id) {
-    if (!confirm('Supprimer cet élément de l\'historique ?')) return;
+    if (!confirm('Delete this item from history?')) return;
     
     const history = getHistory();
     const filtered = history.filter(h => h.id !== id);
@@ -532,29 +532,29 @@ window.deleteHistoryItem = deleteHistoryItem;
 function updateWordCounts() {
     // Only update counts for visible textareas using their actual content
     if (elements.cvCount && elements.cvTextarea && !elements.cvTextarea.classList.contains('hidden')) {
-        const cvWords = elements.cvTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
-        elements.cvCount.textContent = `${cvWords} mots`;
+    const cvWords = elements.cvTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+        elements.cvCount.textContent = `${cvWords} words`;
     }
     if (elements.jdCount && elements.jdTextarea && !elements.jdTextarea.classList.contains('hidden')) {
-        const jdWords = elements.jdTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
-        elements.jdCount.textContent = `${jdWords} mots`;
+    const jdWords = elements.jdTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+        elements.jdCount.textContent = `${jdWords} words`;
     }
 }
 
 // Handle file upload
 async function handleFileUpload(event, type) {
     try {
-        const file = event.target.files[0];
+    const file = event.target.files[0];
         if (!file) {
             console.log('No file selected');
             return;
         }
 
         console.log(`Uploading ${type} file:`, file.name);
-        showLoading('Extraction du texte...');
+        showLoading('Extracting text...');
 
-        const formData = new FormData();
-        formData.append('file', file);
+    const formData = new FormData();
+    formData.append('file', file);
 
         const response = await fetch('/api/parse-pdf', {
             method: 'POST',
@@ -573,7 +573,7 @@ async function handleFileUpload(event, type) {
         }
 
         if (!data.text || !data.text.trim()) {
-            showError('Le fichier est vide ou n\'a pas pu être extrait');
+            showError('The file is empty or could not be extracted');
             return;
         }
 
@@ -585,7 +585,7 @@ async function handleFileUpload(event, type) {
             console.log('CV text stored, length:', state.cvText.length);
             // Show success status indicator
             if (elements.cvUploadStatus) {
-                elements.cvUploadStatus.classList.remove('hidden');
+            elements.cvUploadStatus.classList.remove('hidden');
             }
             // Keep textarea hidden and empty - user can paste manually if needed
             if (elements.cvTextarea && elements.cvTextarea.classList.contains('hidden')) {
@@ -599,7 +599,7 @@ async function handleFileUpload(event, type) {
             console.log('Job description stored, length:', state.jobDescription.length);
             // Show success status indicator
             if (elements.jdUploadStatus) {
-                elements.jdUploadStatus.classList.remove('hidden');
+            elements.jdUploadStatus.classList.remove('hidden');
             }
             // Keep textarea hidden and empty - user can paste manually if needed
             if (elements.jdTextarea && elements.jdTextarea.classList.contains('hidden')) {
@@ -615,7 +615,7 @@ async function handleFileUpload(event, type) {
         }
     } catch (error) {
         console.error('Error in handleFileUpload:', error);
-        showError(`Erreur lors de l'upload: ${error.message}`);
+        showError(`Upload error: ${error.message}`);
     } finally {
         hideLoading();
     }
@@ -626,7 +626,7 @@ async function optimizeCv() {
     // Validation
     if (!validateInputs()) return;
 
-    showLoading('Optimisation du CV en cours...');
+    showLoading('Optimizing CV...');
 
     const payload = {
         cv_text: state.cvText,
@@ -687,7 +687,7 @@ async function optimizeCv() {
             max_date_years: payload.max_date_years
         });
     } catch (error) {
-        showError(`Erreur: ${error.message}`);
+        showError(`Error: ${error.message}`);
     } finally {
         hideLoading();
     }
@@ -699,11 +699,11 @@ async function generateLetter() {
     if (!validateInputs()) return;
 
     if (!state.optimizedCv && !state.cvText) {
-        showError('Veuillez d\'abord optimiser votre CV ou avoir un CV dans le champ.');
+        showError('Please first optimize your CV or have a CV in the field.');
         return;
     }
 
-    showLoading('Génération de la lettre de motivation...');
+    showLoading('Generating cover letter...');
 
     const payload = {
         cv_text: state.cvText,
@@ -745,7 +745,7 @@ async function generateLetter() {
             target_words: payload.target_words
         });
     } catch (error) {
-        showError(`Erreur: ${error.message}`);
+        showError(`Error: ${error.message}`);
     } finally {
         hideLoading();
     }
@@ -754,19 +754,19 @@ async function generateLetter() {
 // Validate inputs
 function validateInputs() {
     if (!elements.apiKeyInput.value.trim()) {
-        showError('Veuillez entrer votre clé API OpenAI');
+        showError('Please enter your OpenAI API key');
         elements.apiKeyInput.focus();
         return false;
     }
 
     if (!state.cvText.trim()) {
-        showError('Veuillez entrer ou uploader votre CV');
+        showError('Please enter or upload your CV');
         elements.cvTextarea.focus();
         return false;
     }
 
     if (!state.jobDescription.trim()) {
-        showError('Veuillez entrer ou uploader la description du poste');
+        showError('Please enter or upload the job description');
         elements.jdTextarea.focus();
         return false;
     }
@@ -827,7 +827,7 @@ async function copyToClipboard(type) {
     }
 
     if (!text) {
-        showError('Aucun contenu à copier');
+        showError('No content to copy');
         return;
     }
 
@@ -835,12 +835,12 @@ async function copyToClipboard(type) {
         await navigator.clipboard.writeText(text);
         // Show a brief success message (using a simple alert for positive feedback)
         const originalText = elements.errorModalClose.textContent;
-        elements.errorModalClose.textContent = '✓ Copié !';
+        elements.errorModalClose.textContent = '✓ Copied!';
         setTimeout(() => {
             elements.errorModalClose.textContent = originalText;
         }, 2000);
     } catch (error) {
-        showError(`Erreur lors de la copie: ${error.message}`);
+        showError(`Copy error: ${error.message}`);
     }
 }
 
@@ -848,7 +848,7 @@ async function copyToClipboard(type) {
 async function downloadContent(type) {
     if (type === 'optimized-cv') {
         if (!state.optimizedCv) {
-            showError('Aucun CV optimisé à télécharger');
+            showError('No optimized CV to download');
             return;
         }
         
@@ -866,7 +866,7 @@ async function downloadContent(type) {
             
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || 'Erreur lors de la génération du PDF');
+                throw new Error(error.error || 'Error generating PDF');
             }
             
             // Download PDF
@@ -874,20 +874,20 @@ async function downloadContent(type) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'cv_optimise.pdf';
+            a.download = 'optimized_cv.pdf';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            showError('Erreur lors de la génération du PDF: ' + error.message);
+            showError('Error generating PDF: ' + error.message);
             // Fallback to TXT if PDF generation fails
             const blob = new Blob([state.optimizedCv], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'cv_optimise.txt';
+            a.download = 'optimized_cv.txt';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -896,7 +896,7 @@ async function downloadContent(type) {
     } else if (type === 'cover-letter') {
         const text = state.coverLetter;
         if (!text) {
-            showError('Aucune lettre de motivation à télécharger');
+            showError('No cover letter to download');
             return;
         }
         
@@ -904,7 +904,7 @@ async function downloadContent(type) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'lettre_motivation.txt';
+        a.download = 'cover_letter.txt';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -937,7 +937,7 @@ function autoResizeTextarea(textarea) {
 }
 
 // Loading overlay
-function showLoading(message = 'Traitement en cours...') {
+function showLoading(message = 'Processing...') {
     elements.loadingText.textContent = message;
     elements.loadingOverlay.classList.remove('hidden');
 }
@@ -1067,23 +1067,23 @@ function displaySkills(matchData) {
     const stats = matchData.stats || {};
     elements.skillsStats.innerHTML = `
         <div class="stat-item">
-            <div class="stat-label">Correspondance</div>
+            <div class="stat-label">Match</div>
             <div class="stat-value" style="color: var(--success-color);">${stats.match_percentage || 0}%</div>
         </div>
         <div class="stat-item">
-            <div class="stat-label">Compétences CV</div>
+            <div class="stat-label">CV Skills</div>
             <div class="stat-value">${stats.total_cv || 0}</div>
         </div>
         <div class="stat-item">
-            <div class="stat-label">Compétences Offre</div>
+            <div class="stat-label">Job Skills</div>
             <div class="stat-value">${stats.total_job || 0}</div>
         </div>
         <div class="stat-item">
-            <div class="stat-label">Correspondances</div>
+            <div class="stat-label">Matches</div>
             <div class="stat-value" style="color: var(--success-color);">${stats.matched_count || 0}</div>
         </div>
         <div class="stat-item">
-            <div class="stat-label">Manquantes</div>
+            <div class="stat-label">Missing</div>
             <div class="stat-value" style="color: var(--error-color);">${stats.missing_count || 0}</div>
         </div>
     `;
@@ -1119,7 +1119,7 @@ function displaySkills(matchData) {
         });
     }
     
-    elements.skillsTags.innerHTML = tagsHTML || '<p style="color: var(--text-secondary);">Aucune compétence à afficher</p>';
+    elements.skillsTags.innerHTML = tagsHTML || '<p style="color: var(--text-secondary);">No skills to display</p>';
 }
 
 // ==================== ASSISTANT FUNCTIONALITY ====================
@@ -1174,11 +1174,11 @@ async function sendAssistantRequest() {
     // Use optimized CV if available, otherwise use original CV
     const cvToUse = state.optimizedCv || state.cvText;
     if (!cvToUse || !cvToUse.trim()) {
-        showError('Veuillez d\'abord charger votre CV');
+        showError('Please first load your CV');
         return;
     }
     if (!elements.apiKeyInput.value.trim()) {
-        showError('Veuillez entrer votre clé API OpenAI');
+        showError('Please enter your OpenAI API key');
         return;
     }
     
@@ -1232,13 +1232,13 @@ async function sendAssistantRequest() {
         
         // Process the response
         if (data.success) {
-            let responseText = data.explanation || 'Modification effectuée';
+            let responseText = data.explanation || 'Modification completed';
             
             // Update CV if needed
             if (data.action === 'update_cv' || data.action === 'update_both') {
                 state.optimizedCv = data.updated_cv;
                 elements.optimizedCvContent.textContent = data.updated_cv;
-                responseText += '\n\n✅ CV optimisé mis à jour';
+                responseText += '\n\n✅ Optimized CV updated';
             }
             
             // Update skills if needed
@@ -1254,7 +1254,7 @@ async function sendAssistantRequest() {
                 if (state.cvSkills.length > 0 && state.jobSkills.length > 0) {
                     matchSkills();
                 }
-                responseText += '\n\n✅ Compétences mises à jour';
+                responseText += '\n\n✅ Skills updated';
             }
             
             // Add assistant response
@@ -1267,13 +1267,13 @@ async function sendAssistantRequest() {
             });
             saveAssistantHistory();
         } else {
-            addAssistantMessage('assistant', `Erreur: ${data.error || 'Modification échouée'}`, false);
+            addAssistantMessage('assistant', `Error: ${data.error || 'Modification failed'}`, false);
         }
         
     } catch (error) {
         removeAssistantMessage(loadingId);
-        showError(`Erreur lors de l'envoi: ${error.message}`);
-        addAssistantMessage('assistant', `Erreur: ${error.message}`, false);
+        showError(`Send error: ${error.message}`);
+        addAssistantMessage('assistant', `Error: ${error.message}`, false);
     }
 }
 
@@ -1300,7 +1300,7 @@ function addAssistantMessage(role, content, isLoading = false) {
         messageDiv.innerHTML = `
             <div class="assistant-message-content">
                 <div class="spinner-small"></div>
-                <span>Traitement en cours...</span>
+                <span>Processing...</span>
             </div>
         `;
     } else {
@@ -1340,7 +1340,7 @@ function addAssistantMessageHTML(role, content, isLoading = false) {
         messageDiv.innerHTML = `
             <div class="assistant-message-content">
                 <div class="spinner-small"></div>
-                <span>Traitement en cours...</span>
+                <span>Processing...</span>
             </div>
         `;
     } else {
@@ -1372,12 +1372,12 @@ function clearAssistantMessages() {
     }
     elements.assistantMessages.innerHTML = `
         <div class="assistant-empty">
-            <p>💬 Commencez par générer un CV optimisé, puis demandez des ajustements ici</p>
+            <p>💬 Start by generating an optimized CV, then request adjustments here</p>
             <p class="assistant-examples">
-                Exemples :<br>
-                • "Ajoute la compétence Excel avancé"<br>
-                • "Corrige 'advanced exce' en 'advanced excel'"<br>
-                • "Ajoute une section sur mes projets Python"
+                Examples:<br>
+                • "Add advanced Excel skill"<br>
+                • "Fix 'advanced exce' to 'advanced excel'"<br>
+                • "Add a section about my Python projects"
             </p>
         </div>
     `;
@@ -1412,7 +1412,7 @@ function updateAssistantSendButton() {
 
 // Clear assistant history
 async function clearAssistantHistory() {
-    if (!confirm('Êtes-vous sûr de vouloir effacer toute la conversation ?')) {
+    if (!confirm('Are you sure you want to clear the entire conversation?')) {
         return;
     }
     
@@ -1440,7 +1440,7 @@ async function clearAssistantHistory() {
         saveAssistantHistory();
         
     } catch (error) {
-        showError(`Erreur lors de l'effacement: ${error.message}`);
+        showError(`Clear error: ${error.message}`);
     }
 }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +10,7 @@
     <div class="container">
         <header>
             <h1>📄 CV Optimizer</h1>
-            <p class="subtitle">Optimisez votre CV et générez une lettre de motivation personnalisée</p>
+            <p class="subtitle">Optimize your CV and generate a personalized cover letter</p>
         </header>
 
         <main>
@@ -18,11 +18,11 @@
             <div class="main-tabs">
                 <button class="main-tab-btn active" data-main-tab="generation">
                     <span class="tab-icon">✨</span>
-                    Génération
+                    Generation
                 </button>
                 <button class="main-tab-btn" data-main-tab="history">
                     <span class="tab-icon">📚</span>
-                    Historique
+                    History
                 </button>
             </div>
 
@@ -34,31 +34,31 @@
                 
                 <div class="form-group">
                     <label for="api-key">
-                        Clé API OpenAI *
-                        <span class="tooltip-icon" data-tooltip="Votre clé d'API OpenAI est nécessaire pour utiliser les modèles de langage. Vous pouvez l'obtenir gratuitement sur https://platform.openai.com/account/api-keys. Cette clé est utilisée uniquement pour cette session et n'est jamais stockée.">?</span>
+                        OpenAI API Key *
+                        <span class="tooltip-icon" data-tooltip="Your OpenAI API key is required to use the language models. You can get it for free at https://platform.openai.com/account/api-keys. This key is only used for this session and is never stored.">?</span>
                     </label>
                     <input type="password" id="api-key" placeholder="sk-proj-..." required>
-                    <small>Votre clé API sera utilisée uniquement pour cette session</small>
+                    <small>Your API key will only be used for this session</small>
                 </div>
 
                 <div class="config-grid">
                     <div class="form-group">
-                        <label for="language">Langue de sortie</label>
+                        <label for="language">Output Language</label>
                         <select id="language">
                             <option value="fr">Français</option>
                             <option value="en">English</option>
                             <option value="es">Español</option>
                         </select>
-                        <small>Langue pour le CV et la lettre de motivation</small>
+                        <small>Language for the CV and cover letter</small>
                     </div>
 
                     <div class="form-group">
                         <label for="model">
-                            Modèle
-                            <span class="tooltip-icon" data-tooltip="Le modèle de langage utilisé pour générer le CV et la lettre. GPT-4o-mini est recommandé pour un bon équilibre entre qualité et coût. GPT-4 offre une meilleure qualité mais est plus cher.">?</span>
+                            Model
+                            <span class="tooltip-icon" data-tooltip="The language model used to generate the CV and cover letter. GPT-4o-mini is recommended for a good balance between quality and cost. GPT-4 offers better quality but is more expensive.">?</span>
                         </label>
                         <select id="model">
-                            <option value="gpt-4o-mini">GPT-4o-mini (Recommandé)</option>
+                            <option value="gpt-4o-mini">GPT-4o-mini (Recommended)</option>
                             <option value="gpt-4">GPT-4</option>
                             <option value="gpt-4-turbo">GPT-4 Turbo</option>
                             <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
@@ -67,8 +67,8 @@
 
                     <div class="form-group">
                         <label for="temperature">
-                            Température
-                            <span class="tooltip-icon" data-tooltip="Contrôle la créativité et la variété des réponses. Valeur basse (0.1-0.3) = plus déterministe et cohérent, idéal pour les CV. Valeur élevée (0.7-1.0) = plus créatif et varié, idéal pour les lettres de motivation.">?</span>
+                            Temperature
+                            <span class="tooltip-icon" data-tooltip="Controls the creativity and variety of responses. Low value (0.1-0.3) = more deterministic and consistent, ideal for CVs. High value (0.7-1.0) = more creative and varied, ideal for cover letters.">?</span>
                         </label>
                         <input type="range" id="temperature" min="0" max="1" step="0.01" value="0.3">
                         <span class="value-display" id="temp-value">0.30</span>
@@ -78,7 +78,7 @@
 
             <!-- CV Input Section -->
             <section class="input-section">
-                <h2>📋 Votre CV</h2>
+                <h2>📋 Your CV</h2>
                 
                 <div class="upload-options">
                     <div class="upload-option">
@@ -88,25 +88,25 @@
                         </label>
                         <input type="file" id="cv-file" accept=".pdf,.txt" hidden>
                     </div>
-                    <div class="divider">ou</div>
+                    <div class="divider">or</div>
                     <div class="upload-option">
-                        <button type="button" class="btn-secondary" id="paste-cv-btn">Coller le texte</button>
+                        <button type="button" class="btn-secondary" id="paste-cv-btn">Paste text</button>
                     </div>
                 </div>
 
                 <div class="textarea-container">
-                    <textarea id="cv-text" placeholder="Votre CV (texte ou uploadé depuis un fichier)..." rows="8" class="hidden"></textarea>
-                    <div class="char-count hidden" id="cv-count">0 mots</div>
+                    <textarea id="cv-text" placeholder="Your CV (text or uploaded from a file)..." rows="8" class="hidden"></textarea>
+                    <div class="char-count hidden" id="cv-count">0 words</div>
                 </div>
                 <div id="cv-upload-status" class="upload-status hidden">
                     <span class="status-icon">✓</span>
-                    <span class="status-text">Fichier chargé avec succès</span>
+                    <span class="status-text">File loaded successfully</span>
                 </div>
             </section>
 
             <!-- Job Description Section -->
             <section class="input-section">
-                <h2>💼 Description du Poste</h2>
+                <h2>💼 Job Description</h2>
                 
                 <div class="upload-options">
                     <div class="upload-option">
@@ -116,42 +116,42 @@
                         </label>
                         <input type="file" id="jd-file" accept=".pdf,.txt" hidden>
                     </div>
-                    <div class="divider">ou</div>
+                    <div class="divider">or</div>
                     <div class="upload-option">
-                        <button type="button" class="btn-secondary" id="paste-jd-btn">Coller le texte</button>
+                        <button type="button" class="btn-secondary" id="paste-jd-btn">Paste text</button>
                     </div>
                 </div>
 
                 <div class="textarea-container">
-                    <textarea id="job-description" placeholder="Description du poste (texte ou uploadé depuis un fichier)..." rows="8" class="hidden"></textarea>
-                    <div class="char-count hidden" id="jd-count">0 mots</div>
+                    <textarea id="job-description" placeholder="Job description (text or uploaded from a file)..." rows="8" class="hidden"></textarea>
+                    <div class="char-count hidden" id="jd-count">0 words</div>
                 </div>
                 <div id="jd-upload-status" class="upload-status hidden">
                     <span class="status-icon">✓</span>
-                    <span class="status-text">Fichier chargé avec succès</span>
+                    <span class="status-text">File loaded successfully</span>
                 </div>
             </section>
 
             <!-- Skills Matching Section -->
             <section class="skills-section">
-                <h2>🎯 Analyse des Compétences</h2>
+                <h2>🎯 Skills Analysis</h2>
                 
                 <div class="skills-legend">
                     <div class="legend-item">
                         <span class="legend-color legend-gray"></span>
-                        <span class="legend-text">Compétences uniquement dans le CV</span>
+                        <span class="legend-text">Skills only in CV</span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-color legend-red"></span>
-                        <span class="legend-text">Compétences requises manquantes</span>
+                        <span class="legend-text">Missing required skills</span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-color legend-green"></span>
-                        <span class="legend-text">Compétences correspondantes</span>
+                        <span class="legend-text">Matching skills</span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-color legend-blue"></span>
-                        <span class="legend-text">Compétences intéressantes du CV</span>
+                        <span class="legend-text">Interesting CV skills</span>
                     </div>
                 </div>
 
@@ -162,45 +162,45 @@
 
                 <div id="skills-loading" class="skills-loading hidden">
                     <div class="spinner-small"></div>
-                    <span>Analyse des compétences en cours...</span>
+                    <span>Analyzing skills...</span>
                 </div>
 
                 <div id="skills-empty" class="skills-empty">
-                    <p>📋 Chargez votre CV et la description du poste pour voir l'analyse des compétences</p>
+                    <p>📋 Load your CV and job description to see the skills analysis</p>
                 </div>
             </section>
 
             <!-- CV Optimization Parameters -->
             <section class="params-section">
-                <h2>🎯 Paramètres d'Optimisation du CV</h2>
+                <h2>🎯 CV Optimization Parameters</h2>
                 
                 <div class="params-grid">
                     <div class="form-group">
-                        <label for="min-experiences">Expériences min</label>
+                        <label for="min-experiences">Min experiences</label>
                         <input type="number" id="min-experiences" min="1" max="20" value="3">
                     </div>
 
                     <div class="form-group">
-                        <label for="max-experiences">Expériences max</label>
+                        <label for="max-experiences">Max experiences</label>
                         <input type="number" id="max-experiences" min="1" max="20" value="8">
                     </div>
 
                     <div class="form-group">
-                        <label for="max-date-years">Années max (optionnel)</label>
+                        <label for="max-date-years">Max years (optional)</label>
                         <input type="number" id="max-date-years" min="1" max="30" placeholder="Ex: 5">
-                        <small>Garder uniquement les X dernières années</small>
+                        <small>Keep only the last X years</small>
                     </div>
                 </div>
             </section>
 
             <!-- Cover Letter Parameters -->
             <section class="params-section">
-                <h2>✉️ Paramètres de la Lettre de Motivation</h2>
+                <h2>✉️ Cover Letter Parameters</h2>
                 
                 <div class="form-group">
-                    <label for="letter-words">Nombre de mots (par dizaines)</label>
+                    <label for="letter-words">Number of words (by tens)</label>
                     <input type="number" id="letter-words" min="100" max="1000" step="10" value="300">
-                    <small>Ex: 300 = environ 300 mots</small>
+                    <small>Ex: 300 = approximately 300 words</small>
                 </div>
             </section>
 
@@ -208,36 +208,36 @@
             <section class="actions-section">
                 <button id="optimize-btn" class="btn-primary">
                     <span class="btn-icon">✨</span>
-                    Optimiser le CV
+                    Optimize CV
                 </button>
                 <button id="generate-letter-btn" class="btn-primary">
                     <span class="btn-icon">✉️</span>
-                    Générer la Lettre de Motivation
+                    Generate Cover Letter
                 </button>
             </section>
 
             <!-- Results Section -->
             <section id="results-section" class="results-section hidden">
-                <h2>📊 Résultats</h2>
+                <h2>📊 Results</h2>
                 
                 <div class="tabs">
-                    <button class="tab-btn active" data-tab="optimized-cv">CV Optimisé</button>
-                    <button class="tab-btn" data-tab="cover-letter">Lettre de Motivation</button>
+                    <button class="tab-btn active" data-tab="optimized-cv">Optimized CV</button>
+                    <button class="tab-btn" data-tab="cover-letter">Cover Letter</button>
                     <button class="tab-btn" data-tab="assistant">Assistant</button>
                 </div>
 
                 <div class="tab-content active" id="optimized-cv-tab">
                     <div class="result-header">
-                        <button class="btn-copy" data-copy="optimized-cv">📋 Copier</button>
-                        <button class="btn-download" data-download="optimized-cv">💾 Télécharger</button>
+                        <button class="btn-copy" data-copy="optimized-cv">📋 Copy</button>
+                        <button class="btn-download" data-download="optimized-cv">💾 Download</button>
                     </div>
                     <div class="result-content" id="optimized-cv-content"></div>
                 </div>
 
                 <div class="tab-content" id="cover-letter-tab">
                     <div class="result-header">
-                        <button class="btn-copy" data-copy="cover-letter">📋 Copier</button>
-                        <button class="btn-download" data-download="cover-letter">💾 Télécharger</button>
+                        <button class="btn-copy" data-copy="cover-letter">📋 Copy</button>
+                        <button class="btn-download" data-download="cover-letter">💾 Download</button>
                     </div>
                     <div class="result-content" id="cover-letter-content"></div>
                 </div>
@@ -245,33 +245,33 @@
                 <!-- Assistant Chat Tab -->
                 <div class="tab-content" id="assistant-tab">
                     <div class="assistant-header">
-                        <h3>💬 Assistant Conversationnel</h3>
-                        <p class="assistant-description">Demandez des ajustements sur votre CV optimisé ou corrigez les compétences détectées</p>
+                        <h3>💬 Conversational Assistant</h3>
+                        <p class="assistant-description">Request adjustments to your optimized CV or correct detected skills</p>
                     </div>
                     
                     <div class="assistant-chat-container">
                         <div id="assistant-messages" class="assistant-messages">
                             <div class="assistant-empty">
-                                <p>💬 Commencez par générer un CV optimisé, puis demandez des ajustements ici</p>
+                                <p>💬 Start by generating an optimized CV, then request adjustments here</p>
                                 <p class="assistant-examples">
-                                    Exemples :<br>
-                                    • "Ajoute la compétence Excel avancé"<br>
-                                    • "Corrige 'advanced exce' en 'advanced excel'"<br>
-                                    • "Ajoute une section sur mes projets Python"
+                                    Examples:<br>
+                                    • "Add advanced Excel skill"<br>
+                                    • "Fix 'advanced exce' to 'advanced excel'"<br>
+                                    • "Add a section about my Python projects"
                                 </p>
                             </div>
                         </div>
                         
                         <div class="assistant-input-container">
                             <div class="assistant-input-wrapper">
-                                <textarea id="assistant-input" placeholder="Ex: Ajoute la compétence Excel avancé..." rows="2"></textarea>
+                                <textarea id="assistant-input" placeholder="Ex: Add advanced Excel skill..." rows="2"></textarea>
                                 <button id="assistant-send-btn" class="btn-primary" disabled>
                                     <span class="btn-icon">📤</span>
-                                    Envoyer
+                                    Send
                                 </button>
                             </div>
                             <div class="assistant-actions">
-                                <button id="clear-assistant-btn" class="btn-secondary">🗑️ Effacer</button>
+                                <button id="clear-assistant-btn" class="btn-secondary">🗑️ Clear</button>
                             </div>
                         </div>
                     </div>
@@ -283,20 +283,20 @@
             <!-- History Tab Content (Partie 2 - Vert) -->
             <div id="history-content" class="main-tab-content">
                 <section class="history-section">
-                    <h2>📚 Historique des Générations</h2>
-                    <p class="history-description">Retrouvez tous vos CV optimisés et lettres de motivation générés pendant cette session et les précédentes.</p>
+                    <h2>📚 Generation History</h2>
+                    <p class="history-description">Find all your optimized CVs and cover letters generated during this session and previous ones.</p>
                     
                     <div class="history-filters">
-                        <button class="filter-btn active" data-filter="all">Tout</button>
-                        <button class="filter-btn" data-filter="cv">CV Optimisés</button>
-                        <button class="filter-btn" data-filter="letter">Lettres de Motivation</button>
-                        <button class="filter-btn danger" id="clear-history-btn">🗑️ Effacer l'historique</button>
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="cv">Optimized CVs</button>
+                        <button class="filter-btn" data-filter="letter">Cover Letters</button>
+                        <button class="filter-btn danger" id="clear-history-btn">🗑️ Clear history</button>
                     </div>
 
                     <div id="history-list" class="history-list">
                         <div class="history-empty">
-                            <p>📭 Aucun historique pour le moment</p>
-                            <p class="history-empty-subtitle">Vos générations apparaîtront ici après utilisation de la section Génération</p>
+                            <p>📭 No history yet</p>
+                            <p class="history-empty-subtitle">Your generations will appear here after using the Generation section</p>
                         </div>
                     </div>
                 </section>
@@ -306,7 +306,7 @@
             <!-- Loading Overlay -->
             <div id="loading-overlay" class="loading-overlay hidden">
                 <div class="spinner"></div>
-                <p id="loading-text">Traitement en cours...</p>
+                <p id="loading-text">Processing...</p>
             </div>
 
             <!-- Error Modal -->
@@ -314,13 +314,13 @@
                 <div class="error-modal-content">
                     <div class="error-modal-header">
                         <span>⚠️</span>
-                        <h3>Erreur</h3>
+                        <h3>Error</h3>
                     </div>
                     <div class="error-modal-body">
                         <div id="error-message" class="error-modal-message"></div>
                     </div>
                     <div class="error-modal-footer">
-                        <button id="error-modal-close" class="error-modal-close">Fermer</button>
+                        <button id="error-modal-close" class="error-modal-close">Close</button>
                     </div>
                 </div>
             </div>
@@ -329,12 +329,12 @@
 
     <!-- Quick Navigation Menu -->
     <div id="quick-nav-menu" class="quick-nav-menu">
-        <button id="quick-nav-toggle" class="quick-nav-toggle" aria-label="Menu de navigation rapide">
+        <button id="quick-nav-toggle" class="quick-nav-toggle" aria-label="Quick navigation menu">
             <span class="quick-nav-icon">😄</span>
         </button>
         <div id="quick-nav-popup" class="quick-nav-popup hidden">
             <div class="quick-nav-header">
-                <span>Navigation rapide</span>
+                <span>Quick Navigation</span>
             </div>
             <div class="quick-nav-items">
                 <button class="quick-nav-item" data-nav="config">
@@ -343,15 +343,15 @@
                 </button>
                 <button class="quick-nav-item" data-nav="api-key">
                     <span class="quick-nav-item-icon">🔑</span>
-                    <span class="quick-nav-item-text">Clé API</span>
+                    <span class="quick-nav-item-text">API Key</span>
                 </button>
                 <button class="quick-nav-item" data-nav="optimized-cv">
                     <span class="quick-nav-item-icon">📄</span>
-                    <span class="quick-nav-item-text">CV Optimisé</span>
+                    <span class="quick-nav-item-text">Optimized CV</span>
                 </button>
                 <button class="quick-nav-item" data-nav="cover-letter">
                     <span class="quick-nav-item-icon">✉️</span>
-                    <span class="quick-nav-item-text">Lettre de Motivation</span>
+                    <span class="quick-nav-item-text">Cover Letter</span>
                 </button>
                 <button class="quick-nav-item" data-nav="assistant">
                     <span class="quick-nav-item-icon">💬</span>
@@ -359,7 +359,7 @@
                 </button>
                 <button class="quick-nav-item" data-nav="history">
                     <span class="quick-nav-item-icon">📚</span>
-                    <span class="quick-nav-item-text">Historique</span>
+                    <span class="quick-nav-item-text">History</span>
                 </button>
             </div>
         </div>

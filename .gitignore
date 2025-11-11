@@ -8,3 +8,4 @@ __pycache__/
 uploads/
 *.log
 ANALYSE_CONFORMITE.md
+COMMANDS.md
