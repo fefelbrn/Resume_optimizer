@@ -186,6 +186,7 @@ def api_extract_skills():
         text_type = data.get('text_type', 'cv')
         api_key = data.get('api_key', '')
         model = data.get('model', 'gpt-4o-mini')
+        temperature = float(data.get('temperature', 0.2))
         
         if not api_key:
             return jsonify({'error': 'API key is required'}), 400
@@ -197,7 +198,8 @@ def api_extract_skills():
             text=text,
             text_type=text_type,
             api_key=api_key,
-            model=model
+            model=model,
+            temperature=temperature
         )
         
         if result.get('status') == 'error':
@@ -232,6 +234,7 @@ def api_match_skills():
         cv_text = data.get('cv_text', '')
         job_text = data.get('job_text', '')
         model = data.get('model', 'gpt-4o-mini')
+        temperature = float(data.get('temperature', 0.3))
         
         if not api_key:
             return jsonify({'error': 'API key is required'}), 400
@@ -245,7 +248,8 @@ def api_match_skills():
             api_key=api_key,
             cv_text=cv_text,
             job_text=job_text,
-            model=model
+            model=model,
+            temperature=temperature
         )
         
         if result.get('status') == 'error':

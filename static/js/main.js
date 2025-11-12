@@ -56,6 +56,8 @@ const elements = {
     skillsStats: document.getElementById('skills-stats'),
     skillsLoading: document.getElementById('skills-loading'),
     skillsEmpty: document.getElementById('skills-empty'),
+    skillsTemperatureInput: document.getElementById('skills-temperature'),
+    skillsTempValue: document.getElementById('skills-temp-value'),
     // Assistant elements (may be null if results section is hidden)
     assistantMessages: document.getElementById('assistant-messages'),
     assistantInput: document.getElementById('assistant-input'),
@@ -96,6 +98,14 @@ function setupEventListeners() {
         elements.tempValue.textContent = value.toFixed(2);
     });
         }
+    
+    // Skills temperature slider
+    if (elements.skillsTemperatureInput && elements.skillsTempValue) {
+        elements.skillsTemperatureInput.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            elements.skillsTempValue.textContent = value.toFixed(2);
+        });
+    }
 
     // File uploads
         if (elements.cvFileInput) {
@@ -776,8 +786,14 @@ function validateInputs() {
 
 // Switch tabs
 function switchTab(tabName) {
+    console.log('Switching to tab:', tabName);
+    
+    // Re-fetch elements to ensure they're available
+    const tabs = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
     // Update tab buttons
-    elements.tabs.forEach(tab => {
+    tabs.forEach(tab => {
         if (tab.dataset.tab === tabName) {
             tab.classList.add('active');
         } else {
@@ -786,7 +802,7 @@ function switchTab(tabName) {
     });
 
     // Update tab contents
-    elements.tabContents.forEach(content => {
+    tabContents.forEach(content => {
         if (content.id === `${tabName}-tab`) {
             content.classList.add('active');
         } else {
@@ -815,6 +831,8 @@ function switchTab(tabName) {
             updateAssistantSendButton();
         }, 100);
     }
+    
+    console.log('Tab switched to:', tabName);
 }
 
 // Copy to clipboard
@@ -986,7 +1004,8 @@ async function extractSkillsFromText(text, textType) {
                 text: text,
                 text_type: textType,
                 api_key: elements.apiKeyInput.value,
-                model: elements.modelSelect.value
+                model: elements.modelSelect.value,
+                temperature: parseFloat(elements.skillsTemperatureInput ? elements.skillsTemperatureInput.value : 0.2)
             })
         });
         
@@ -1036,7 +1055,8 @@ async function matchSkills() {
                 cv_text: state.cvText,
                 job_text: state.jobDescription,
                 api_key: elements.apiKeyInput.value,
-                model: elements.modelSelect.value
+                model: elements.modelSelect.value,
+                temperature: parseFloat(elements.skillsTemperatureInput ? elements.skillsTemperatureInput.value : 0.3)
             })
         });
         
@@ -1474,46 +1494,78 @@ function escapeHtml(text) {
 
 // Quick Navigation Menu
 function setupQuickNavigation() {
-    if (!elements.quickNavToggle || !elements.quickNavPopup) {
+    // Re-fetch elements to ensure they're available
+    const quickNavToggle = document.getElementById('quick-nav-toggle');
+    const quickNavPopup = document.getElementById('quick-nav-popup');
+    const quickNavItems = document.querySelectorAll('.quick-nav-item');
+    
+    if (!quickNavToggle || !quickNavPopup) {
         console.warn('Quick navigation elements not found');
         return;
     }
 
     // Toggle popup on button click
-    elements.quickNavToggle.addEventListener('click', (e) => {
+    quickNavToggle.addEventListener('click', (e) => {
         e.stopPropagation();
-        elements.quickNavPopup.classList.toggle('hidden');
+        quickNavPopup.classList.toggle('hidden');
     });
 
-    // Handle navigation item clicks
-    elements.quickNavItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const navTarget = item.dataset.nav;
-            navigateTo(navTarget);
-            // Close popup after navigation
-            elements.quickNavPopup.classList.add('hidden');
+    // Handle navigation item clicks - use event delegation for better reliability
+    if (quickNavItems.length > 0) {
+        quickNavItems.forEach(item => {
+            // Remove any existing listeners to avoid duplicates
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
+            
+            newItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const navTarget = newItem.dataset.nav;
+                console.log('Quick nav clicked:', navTarget);
+                if (navTarget) {
+                    navigateTo(navTarget);
+                    // Close popup after navigation
+                    quickNavPopup.classList.add('hidden');
+                }
+            });
         });
-    });
+    } else {
+        // Fallback: use event delegation on the popup
+        quickNavPopup.addEventListener('click', (e) => {
+            const navItem = e.target.closest('.quick-nav-item');
+            if (navItem) {
+                e.stopPropagation();
+                e.preventDefault();
+                const navTarget = navItem.dataset.nav;
+                console.log('Quick nav clicked (delegation):', navTarget);
+                if (navTarget) {
+                    navigateTo(navTarget);
+                    quickNavPopup.classList.add('hidden');
+                }
+            }
+        });
+    }
 
     // Close popup when clicking outside
     document.addEventListener('click', (e) => {
         const quickNavMenu = document.getElementById('quick-nav-menu');
         if (quickNavMenu && !quickNavMenu.contains(e.target)) {
-            elements.quickNavPopup.classList.add('hidden');
+            quickNavPopup.classList.add('hidden');
         }
     });
 
     // Close popup on Escape key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !elements.quickNavPopup.classList.contains('hidden')) {
-            elements.quickNavPopup.classList.add('hidden');
+        if (e.key === 'Escape' && !quickNavPopup.classList.contains('hidden')) {
+            quickNavPopup.classList.add('hidden');
         }
     });
 }
 
 // Navigate to a specific section
 function navigateTo(target) {
+    console.log('Navigating to:', target);
+    
     switch (target) {
         case 'config':
             // Switch to generation tab and scroll to config section
@@ -1522,8 +1574,14 @@ function navigateTo(target) {
                 const configSection = document.querySelector('.config-section');
                 if (configSection) {
                     configSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    // Fallback: scroll to top of generation content
+                    const genContent = document.getElementById('generation-content');
+                    if (genContent) {
+                        genContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
-            }, 100);
+            }, 200);
             break;
 
         case 'api-key':
@@ -1533,50 +1591,93 @@ function navigateTo(target) {
                 const apiKeyInput = document.getElementById('api-key');
                 if (apiKeyInput) {
                     apiKeyInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    apiKeyInput.focus();
+                    setTimeout(() => apiKeyInput.focus(), 300);
                 }
-            }, 100);
+            }, 200);
             break;
 
         case 'optimized-cv':
             // Switch to generation tab and open CV optimized tab
             switchMainTab('generation');
             setTimeout(() => {
-                switchTab('optimized-cv');
+                // Make sure results section is visible
                 const resultsSection = document.getElementById('results-section');
                 if (resultsSection) {
-                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Remove hidden class first (it has !important)
+                    resultsSection.classList.remove('hidden');
                 }
-            }, 100);
+                // Switch to the tab
+                switchTab('optimized-cv');
+                setTimeout(() => {
+                    // Scroll to results section or the tab content
+                    const optimizedCvTab = document.getElementById('optimized-cv-tab');
+                    if (optimizedCvTab) {
+                        optimizedCvTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else if (resultsSection) {
+                        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            }, 300);
             break;
 
         case 'cover-letter':
             // Switch to generation tab and open cover letter tab
             switchMainTab('generation');
             setTimeout(() => {
-                switchTab('cover-letter');
+                // Make sure results section is visible
                 const resultsSection = document.getElementById('results-section');
                 if (resultsSection) {
-                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Remove hidden class first (it has !important)
+                    resultsSection.classList.remove('hidden');
                 }
-            }, 100);
+                // Switch to the tab
+                switchTab('cover-letter');
+                setTimeout(() => {
+                    // Scroll to results section or the tab content
+                    const coverLetterTab = document.getElementById('cover-letter-tab');
+                    if (coverLetterTab) {
+                        coverLetterTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else if (resultsSection) {
+                        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            }, 300);
             break;
 
         case 'assistant':
             // Switch to generation tab and open assistant tab
             switchMainTab('generation');
             setTimeout(() => {
-                switchTab('assistant');
+                // Make sure results section is visible
                 const resultsSection = document.getElementById('results-section');
                 if (resultsSection) {
-                    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Remove hidden class first (it has !important)
+                    resultsSection.classList.remove('hidden');
                 }
-            }, 100);
+                // Switch to the tab
+                switchTab('assistant');
+                setTimeout(() => {
+                    // Scroll to assistant section
+                    const assistantTab = document.getElementById('assistant-tab');
+                    if (assistantTab) {
+                        assistantTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else if (resultsSection) {
+                        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 300);
+            }, 300);
             break;
 
         case 'history':
             // Switch to history tab
             switchMainTab('history');
+            setTimeout(() => {
+                // Scroll to top of history content
+                const historyContent = document.getElementById('history-content');
+                if (historyContent) {
+                    historyContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 200);
             break;
 
         default:
@@ -1586,8 +1687,14 @@ function navigateTo(target) {
 
 // Helper function to switch main tabs
 function switchMainTab(tabName) {
+    console.log('Switching to main tab:', tabName);
+    
+    // Re-fetch elements to ensure they're available
+    const mainTabs = document.querySelectorAll('.main-tab-btn');
+    const mainTabContents = document.querySelectorAll('.main-tab-content');
+    
     // Update tab buttons
-    elements.mainTabs.forEach(tab => {
+    mainTabs.forEach(tab => {
         if (tab.dataset.mainTab === tabName) {
             tab.classList.add('active');
         } else {
@@ -1596,9 +1703,11 @@ function switchMainTab(tabName) {
     });
 
     // Update tab contents
-    elements.mainTabContents.forEach(content => {
+    mainTabContents.forEach(content => {
         if (content.id === `${tabName}-content`) {
             content.classList.add('active');
+            // Ensure the content is visible
+            content.style.display = '';
         } else {
             content.classList.remove('active');
         }
@@ -1608,4 +1717,6 @@ function switchMainTab(tabName) {
     if (tabName === 'history') {
         loadHistory();
     }
+    
+    console.log('Main tab switched to:', tabName);
 }

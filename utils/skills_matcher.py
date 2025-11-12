@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from utils.tools import extract_skills_tool, compare_skills_tool
 
 
-def extract_skills(text: str, text_type: str, api_key: str, model: str = "gpt-4o-mini") -> Dict[str, Any]:
+def extract_skills(text: str, text_type: str, api_key: str, model: str = "gpt-4o-mini", temperature: float = 0.2) -> Dict[str, Any]:
     """
     Extract skills from text (CV or job description).
     
@@ -15,6 +15,7 @@ def extract_skills(text: str, text_type: str, api_key: str, model: str = "gpt-4o
         text_type: "cv" or "job"
         api_key: OpenAI API key
         model: Model to use
+        temperature: Temperature for skill extraction (default 0.2)
     
     Returns:
         Dictionary with 'skills' (list) and 'count' (int)
@@ -23,7 +24,8 @@ def extract_skills(text: str, text_type: str, api_key: str, model: str = "gpt-4o
         "text": text,
         "text_type": text_type,
         "api_key": api_key,
-        "model": model
+        "model": model,
+        "temperature": temperature
     })
     
     return {
@@ -39,7 +41,8 @@ def match_skills(
     api_key: str,
     cv_text: str = "",
     job_text: str = "",
-    model: str = "gpt-4o-mini"
+    model: str = "gpt-4o-mini",
+    temperature: float = 0.3
 ) -> Dict[str, Any]:
     """
     Match CV skills with job description skills.
@@ -51,6 +54,7 @@ def match_skills(
         cv_text: CV text (optional, for context)
         job_text: Job description text (optional, for context)
         model: Model to use
+        temperature: Temperature for skill comparison (default 0.3)
     
     Returns:
         Dictionary with matched, cv_only, job_only, interesting, and stats
@@ -61,7 +65,8 @@ def match_skills(
         "api_key": api_key,
         "cv_text": cv_text,
         "job_text": job_text,
-        "model": model
+        "model": model,
+        "temperature": temperature
     })
     
     return result

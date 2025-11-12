@@ -10,7 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 
 @tool
-def extract_skills_tool(text: str, text_type: str, api_key: str, model: str = "gpt-4o-mini") -> Dict[str, Any]:
+def extract_skills_tool(text: str, text_type: str, api_key: str, model: str = "gpt-4o-mini", temperature: float = 0.2) -> Dict[str, Any]:
     """
     Extract skills from a CV or job description text.
     
@@ -19,6 +19,7 @@ def extract_skills_tool(text: str, text_type: str, api_key: str, model: str = "g
         text_type: Either "cv" or "job" to specify the type
         api_key: OpenAI API key
         model: Model to use
+        temperature: Temperature for skill extraction (0.0-2.0, default 0.2 for precision)
     
     Returns:
         Dictionary with 'skills' (list of strings) and 'count' (number of skills)
@@ -26,7 +27,7 @@ def extract_skills_tool(text: str, text_type: str, api_key: str, model: str = "g
     try:
         llm = ChatOpenAI(
             model=model,
-            temperature=0.2,
+            temperature=temperature,
             api_key=api_key
         )
         
@@ -115,7 +116,7 @@ Return a JSON array of skills only, no explanations."""
 
 
 @tool
-def compare_skills_tool(cv_skills: List[str], job_skills: List[str], api_key: str, cv_text: str = "", job_text: str = "", model: str = "gpt-4o-mini") -> Dict[str, Any]:
+def compare_skills_tool(cv_skills: List[str], job_skills: List[str], api_key: str, cv_text: str = "", job_text: str = "", model: str = "gpt-4o-mini", temperature: float = 0.3) -> Dict[str, Any]:
     """
     Compare CV skills with job description skills to find matches, missing skills, and CV-only skills.
     
@@ -126,6 +127,7 @@ def compare_skills_tool(cv_skills: List[str], job_skills: List[str], api_key: st
         cv_text: CV text (optional, for context)
         job_text: Job description text (optional, for context)
         model: Model to use
+        temperature: Temperature for skill comparison (0.0-2.0, default 0.3 for balanced analysis)
     
     Returns:
         Dictionary with 'matched' (matching skills), 'job_only' (missing skills), 
@@ -172,7 +174,7 @@ def compare_skills_tool(cv_skills: List[str], job_skills: List[str], api_key: st
             try:
                 llm = ChatOpenAI(
                     model=model,
-                    temperature=0.3,
+                    temperature=temperature,
                     api_key=api_key
                 )
                 

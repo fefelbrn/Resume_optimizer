@@ -1,0 +1,3 @@
+# CV Optimizer
+
+Agent-based CV optimization application built with LangChain and LangGraph. The system uses intelligent agents to optimize CVs for specific job descriptions, automatically extract and match skills (identifying matches, gaps, and valuable additions), and generate personalized cover letters. Features include a conversational AI assistant that can refine CVs through natural language requests, real-time skills analysis with color-coded tags, and support for multiple languages (French, English, Spanish). The architecture leverages LangGraph for structured CV optimization workflows and AgentExecutor with ReAct pattern for intelligent conversational assistance, all built on a foundation of reusable LangChain tools.

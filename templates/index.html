@@ -134,6 +134,16 @@
             <section class="skills-section">
                 <h2>🎯 Skills Analysis</h2>
                 
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="skills-temperature" style="display: flex; align-items: center; gap: 8px;">
+                        Skills Extraction Temperature
+                        <span class="tooltip-icon" data-tooltip="Controls creativity vs precision for skill extraction. Lower values (0.1-0.3) = more precise and deterministic extraction. Higher values (0.5-1.0) = more creative interpretation and varied results.">?</span>
+                        <input type="range" id="skills-temperature" min="0" max="1" step="0.01" value="0.2" style="flex: 1; max-width: 200px; margin: 0 8px;">
+                        <span id="skills-temp-value" class="value-display">0.20</span>
+                    </label>
+                    <small>Lower values (0.1-0.3) = more precise extraction | Higher values (0.5-1.0) = more creative interpretation</small>
+                </div>
+                
                 <div class="skills-legend">
                     <div class="legend-item">
                         <span class="legend-color legend-gray"></span>
