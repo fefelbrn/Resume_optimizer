@@ -5,27 +5,14 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from typing import Dict, Any
 import re
-import json
 
 
 def parse_openai_error(error: Exception) -> Dict[str, Any]:
-    """
-    Parse OpenAI API errors and return user-friendly messages.
-    
-    Args:
-        error: The exception from OpenAI API
-        
-    Returns:
-        Dictionary with error_code, error_message, and user_message
-    """
+    """Parse OpenAI API errors and return user-friendly messages."""
     error_str = str(error)
-    
-    # Try to extract error information from the error string
     error_code = None
-    error_message = error_str
     user_message = "Une erreur s'est produite lors de l'appel à l'API OpenAI."
     
-    # Check for 401 (Invalid API Key)
     if "401" in error_str or "invalid_api_key" in error_str.lower() or "Incorrect API key" in error_str:
         error_code = 401
         user_message = (
@@ -35,21 +22,12 @@ def parse_openai_error(error: Exception) -> Dict[str, Any]:
             "2. Obtenir une nouvelle clé sur: https://platform.openai.com/account/api-keys\n"
             "3. Vérifier que votre compte OpenAI a des crédits disponibles"
         )
-    # Check for 429 (Rate Limit)
     elif "429" in error_str or "rate_limit" in error_str.lower():
         error_code = 429
         user_message = (
             "Erreur: Limite de taux dépassée.\n\n"
             "Vous avez fait trop de requêtes. Veuillez attendre quelques instants avant de réessayer."
         )
-    # Check for 500 (Server Error)
-    elif "500" in error_str or "internal_error" in error_str.lower():
-        error_code = 500
-        user_message = (
-            "Erreur: Problème serveur OpenAI.\n\n"
-            "Le serveur OpenAI rencontre des difficultés. Veuillez réessayer dans quelques instants."
-        )
-    # Check for insufficient credits
     elif "insufficient_quota" in error_str.lower() or "billing" in error_str.lower():
         error_code = "billing"
         user_message = (
@@ -57,17 +35,10 @@ def parse_openai_error(error: Exception) -> Dict[str, Any]:
             "Votre compte OpenAI n'a plus de crédits disponibles. "
             "Veuillez ajouter des crédits sur: https://platform.openai.com/account/billing"
         )
-    # Check for invalid model
-    elif "model" in error_str.lower() and ("not found" in error_str.lower() or "invalid" in error_str.lower()):
-        error_code = "model"
-        user_message = (
-            "Erreur: Modèle invalide.\n\n"
-            "Le modèle sélectionné n'est pas disponible. Veuillez choisir un autre modèle."
-        )
     
     return {
         "error_code": error_code,
-        "error_message": error_message,
+        "error_message": error_str,
         "user_message": user_message
     }
 
@@ -82,32 +53,15 @@ def generate_cover_letter(
     target_words: int = 300,
     language: str = "fr",
 ) -> Dict[str, Any]:
-    """
-    Generate a personalized cover letter that doesn't sound AI-generated.
-    
-    Args:
-        cv_text: Original CV text
-        optimized_cv: Optimized CV text
-        job_description: Job description
-        api_key: OpenAI API key
-        model: Model to use
-        temperature: Temperature (higher = more creative/natural)
-        target_words: Target word count (will be rounded to nearest 10)
-        language: Output language code (fr, en, es)
-    
-    Returns:
-        Dictionary with cover_letter and metadata
-    """
+    """Generate a personalized cover letter."""
     llm = ChatOpenAI(
         model=model,
         temperature=temperature,
         api_key=api_key
     )
     
-    # Round to nearest 10
     target_words = round(target_words / 10) * 10
     
-    # Language mapping
     language_names = {
         "fr": "French (Français)",
         "en": "English",
@@ -115,41 +69,28 @@ def generate_cover_letter(
     }
     target_language = language_names.get(language, "French (Français)")
     
-    # Language-specific guidelines
     language_guidelines = {
-        "fr": "- Use appropriate French business letter conventions\n- Use 'Madame, Monsieur' or 'Madame, Monsieur le Directeur' for formal openings\n- Use 'Cordialement' or 'Bien cordialement' for closings\n- Avoid anglicisms and use proper French expressions",
-        "en": "- Use appropriate English business letter conventions\n- Use 'Dear [Name]' or 'Dear Hiring Manager' for openings\n- Use 'Sincerely' or 'Best regards' for closings\n- Use natural English expressions and idioms",
-        "es": "- Use appropriate Spanish business letter conventions\n- Use 'Estimado/a [Nombre]' or 'A quien corresponda' for openings\n- Use 'Atentamente' or 'Saludos cordiales' for closings\n- Use natural Spanish expressions and idioms"
+        "fr": "- Use appropriate French business letter conventions\n- Use 'Madame, Monsieur' or 'Madame, Monsieur le Directeur' for formal openings\n- Use 'Cordialement' or 'Bien cordialement' for closings",
+        "en": "- Use appropriate English business letter conventions\n- Use 'Dear [Name]' or 'Dear Hiring Manager' for openings\n- Use 'Sincerely' or 'Best regards' for closings",
+        "es": "- Use appropriate Spanish business letter conventions\n- Use 'Estimado/a [Nombre]' or 'A quien corresponda' for openings\n- Use 'Atentamente' or 'Saludos cordiales' for closings"
     }
     lang_guidelines = language_guidelines.get(language, language_guidelines["fr"])
     
     system_message = f"""You are a professional writer helping someone write a cover letter. Your goal is to create a letter that sounds completely natural and human-written, NOT AI-generated.
 
-CRITICAL: The entire cover letter must be written in {target_language}. All content, greetings, and closings must be in this language.
+CRITICAL: The entire cover letter must be written in {target_language}.
 
-CRITICAL GUIDELINES TO AVOID AI DETECTION:
-- Use varied sentence lengths (mix short and long sentences)
-- Include occasional conversational elements and personal touches
+GUIDELINES TO AVOID AI DETECTION:
+- Use varied sentence lengths
+- Include personal touches
 - Avoid overly formal or robotic language
-- Use natural transitions, not formulaic connectors
-- Include specific details and anecdotes when possible
-- Vary your vocabulary - don't repeat the same phrases
+- Use natural transitions
+- Include specific details
+- Vary your vocabulary
 - Write in a warm, professional but authentic tone
-- Avoid clichés - be more direct and personal
-- Use contractions naturally where appropriate (if culturally acceptable in {target_language})
-- Include minor imperfections that make it feel human (but keep it professional)
-- Don't overuse exclamation points or excessive enthusiasm
-- Be specific about why THIS company and THIS role, not generic statements
 {lang_guidelines}
 
-Target length: approximately {target_words} words (±20 words is acceptable).
-
-Structure:
-- Opening: Engaging, specific hook (not generic openings)
-- Body paragraphs: 2-3 paragraphs connecting experience to role
-- Closing: Professional but warm sign-off appropriate for {target_language}
-
-Make it sound like a real person wrote this in {target_language}, not an AI assistant."""
+Target length: approximately {target_words} words."""
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_message),
@@ -170,7 +111,7 @@ Write a compelling, natural-sounding cover letter in {target_language} that:
 5. Is approximately {target_words} words
 6. Uses appropriate business letter conventions for {target_language}
 
-Make it personal, authentic, and engaging while remaining professional. Write everything in {target_language}.""")
+Write everything in {target_language}.""")
     ])
     
     chain = prompt | llm
@@ -185,10 +126,6 @@ Make it personal, authentic, and engaging while remaining professional. Write ev
         })
         
         cover_letter = response.content.strip()
-        
-        # Clean up any obvious AI artifacts
-        cover_letter = clean_ai_artifacts(cover_letter)
-        
         word_count = len(cover_letter.split())
         
         return {
@@ -206,30 +143,4 @@ Make it personal, authentic, and engaging while remaining professional. Write ev
             "error_details": error_info["error_message"],
             "cover_letter": None
         }
-
-
-def clean_ai_artifacts(text: str) -> str:
-    """
-    Remove obvious AI-generated patterns from text.
-    """
-    # Remove common AI phrases
-    ai_phrases = [
-        r"I am writing to express my (?:sincere |genuine )?interest",
-        r"I am excited to (?:apply|submit my application)",
-        r"Thank you for (?:considering|taking the time)",
-        r"I believe I would be a (?:great|excellent|perfect) fit",
-    ]
-    
-    for phrase in ai_phrases:
-        text = re.sub(phrase, "", text, flags=re.IGNORECASE)
-    
-    # Remove excessive formality markers
-    text = re.sub(r"\bI am confident that\b", "I'm confident", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bI would like to\b", "I'd like to", text, flags=re.IGNORECASE)
-    
-    # Clean up multiple spaces
-    text = re.sub(r" +", " ", text)
-    text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
-    
-    return text.strip()
 

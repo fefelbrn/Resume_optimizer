@@ -1,2 +1,4 @@
-# Utils package
+"""
+Utils package for CV Optimizer
+"""
 

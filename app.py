@@ -1,16 +1,34 @@
 """
-Flask Backend for CV Optimizer and Cover Letter Generator
+Flask Backend for CV Optimizer - Agent-based architecture
+Uses LangGraph for CV optimization and ReAct for assistant
 """
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import os
-from utils.pdf_parser import extract_text_from_pdf
-from utils.cv_optimizer import optimize_cv
-from utils.letter_generator import generate_cover_letter
-from utils.skills_matcher import extract_skills, match_skills
-from utils.assistant import process_assistant_request
-from utils.pdf_generator import generate_harvard_pdf
 import traceback
+from utils.pdf_parser import extract_text_from_pdf
+from utils.cv_optimizer_agent import optimize_cv_with_agent
+from utils.letter_generator import generate_cover_letter, parse_openai_error
+from utils.skills_matcher import extract_skills, match_skills
+from utils.assistant_agent import process_assistant_request_with_agent
+from utils.pdf_generator import generate_harvard_pdf
+
+try:
+    from langchain.memory import ConversationBufferMemory
+except ImportError:
+    try:
+        from langchain_core.memory import ConversationBufferMemory
+    except ImportError:
+        # Simple fallback
+        class ConversationBufferMemory:
+            def __init__(self, memory_key="chat_history", return_messages=True):
+                self.memory_key = memory_key
+                self.return_messages = return_messages
+                self.chat_memory = type('obj', (object,), {
+                    'messages': [],
+                    'add_user_message': lambda self, msg: self.messages.append(type('obj', (object,), {'content': msg, 'type': 'human'})()),
+                    'add_ai_message': lambda self, msg: self.messages.append(type('obj', (object,), {'content': msg, 'type': 'ai'})())
+                })()
 
 app = Flask(__name__)
 CORS(app)
@@ -23,7 +41,7 @@ ALLOWED_EXTENSIONS = {'pdf', 'txt'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # In-memory storage for assistant conversation history
-assistant_history = {}  # {session_id: [messages]}
+assistant_memory = {}  # {session_id: ConversationBufferMemory}
 
 
 def allowed_file(filename):
@@ -41,11 +59,10 @@ def index():
 
 @app.route('/api/optimize-cv', methods=['POST'])
 def api_optimize_cv():
-    """API endpoint to optimize CV"""
+    """API endpoint to optimize CV using agent"""
     try:
         data = request.json
         
-        # Extract parameters
         cv_text = data.get('cv_text', '')
         job_description = data.get('job_description', '')
         api_key = data.get('api_key', '')
@@ -56,7 +73,6 @@ def api_optimize_cv():
         if not cv_text or not job_description:
             return jsonify({'error': 'CV text and job description are required'}), 400
         
-        # Get optimization parameters
         model = data.get('model', 'gpt-4o-mini')
         temperature = float(data.get('temperature', 0.3))
         min_experiences = int(data.get('min_experiences', 3))
@@ -66,8 +82,8 @@ def api_optimize_cv():
             max_date_years = int(max_date_years)
         language = data.get('language', 'fr')
         
-        # Optimize CV
-        result = optimize_cv(
+        # Use agent-based optimization
+        result = optimize_cv_with_agent(
             cv_text=cv_text,
             job_description=job_description,
             api_key=api_key,
@@ -79,13 +95,31 @@ def api_optimize_cv():
             language=language
         )
         
-        if 'error' in result:
-            return jsonify({'error': result['error']}), 500
+        if result.get('error'):
+            error_info = parse_openai_error(Exception(result['error']))
+            return jsonify({
+                'error': error_info['user_message'],
+                'error_code': error_info.get('error_code'),
+                'agent_logs': result.get('agent_logs', [])
+            }), 500
         
-        return jsonify(result)
-    
+        return jsonify({
+            'optimized_cv': result.get('optimized_cv'),
+            'agent_logs': result.get('agent_logs', []),
+            'cv_skills': result.get('cv_skills', []),
+            'job_skills': result.get('job_skills', []),
+            'skills_comparison': result.get('skills_comparison'),
+            'model_used': result.get('model_used', model),
+            'word_count': result.get('word_count', 0)
+        })
+        
     except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+        error_info = parse_openai_error(e)
+        return jsonify({
+            'error': error_info['user_message'],
+            'error_code': error_info.get('error_code'),
+            'error_details': str(e)
+        }), 500
 
 
 @app.route('/api/generate-letter', methods=['POST'])
@@ -94,7 +128,6 @@ def api_generate_letter():
     try:
         data = request.json
         
-        # Extract parameters
         cv_text = data.get('cv_text', '')
         optimized_cv = data.get('optimized_cv', '')
         job_description = data.get('job_description', '')
@@ -106,13 +139,11 @@ def api_generate_letter():
         if not cv_text or not job_description:
             return jsonify({'error': 'CV text and job description are required'}), 400
         
-        # Get generation parameters
         model = data.get('model', 'gpt-4o-mini')
         temperature = float(data.get('temperature', 0.7))
-        target_words = int(data.get('target_words', 300))
+        target_words = int(data.get('letter_words', 300))
         language = data.get('language', 'fr')
         
-        # Generate cover letter
         result = generate_cover_letter(
             cv_text=cv_text,
             optimized_cv=optimized_cv or cv_text,
@@ -124,60 +155,35 @@ def api_generate_letter():
             language=language
         )
         
-        if 'error' in result:
-            return jsonify({'error': result['error']}), 500
-        
-        return jsonify(result)
-    
-    except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
-
-
-@app.route('/api/parse-pdf', methods=['POST'])
-def api_parse_pdf():
-    """API endpoint to parse PDF files"""
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
-        
-        file = request.files['file']
-        
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Only PDF and TXT allowed'}), 400
-        
-        # Read file content
-        file_content = file.read()
-        
-        # Extract text
-        if file.filename.endswith('.pdf'):
-            text = extract_text_from_pdf(file_content)
-        else:
-            text = file_content.decode('utf-8')
-        
-        if not text.strip():
-            return jsonify({'error': 'Could not extract text from file'}), 400
+        if result.get('error'):
+            return jsonify({
+                'error': result['error'],
+                'error_code': result.get('error_code')
+            }), 500
         
         return jsonify({
-            'text': text,
-            'filename': file.filename,
-            'word_count': len(text.split())
+            'cover_letter': result.get('cover_letter'),
+            'word_count': result.get('word_count', 0),
+            'target_words': result.get('target_words', target_words),
+            'model_used': result.get('model_used', model)
         })
-    
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_info = parse_openai_error(e)
+        return jsonify({
+            'error': error_info['user_message'],
+            'error_code': error_info.get('error_code')
+        }), 500
 
 
 @app.route('/api/extract-skills', methods=['POST'])
 def api_extract_skills():
-    """API endpoint to extract skills from CV or job description"""
+    """API endpoint to extract skills from text"""
     try:
         data = request.json
         
         text = data.get('text', '')
-        text_type = data.get('text_type', 'cv')  # 'cv' or 'job'
+        text_type = data.get('text_type', 'cv')
         api_key = data.get('api_key', '')
         model = data.get('model', 'gpt-4o-mini')
         
@@ -187,80 +193,125 @@ def api_extract_skills():
         if not text:
             return jsonify({'error': 'Text is required'}), 400
         
-        result = extract_skills(text, api_key, text_type, model)
+        result = extract_skills(
+            text=text,
+            text_type=text_type,
+            api_key=api_key,
+            model=model
+        )
         
-        if 'error' in result:
-            return jsonify({'error': result['error']}), 500
+        if result.get('status') == 'error':
+            return jsonify({
+                'error': result.get('error', 'Error extracting skills'),
+                'skills': []
+            }), 500
         
-        return jsonify(result)
-    
+        return jsonify({
+            'skills': result.get('skills', []),
+            'count': result.get('count', 0)
+        })
+        
     except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+        error_info = parse_openai_error(e)
+        return jsonify({
+            'error': error_info['user_message'],
+            'error_code': error_info.get('error_code'),
+            'skills': []
+        }), 500
 
 
 @app.route('/api/match-skills', methods=['POST'])
 def api_match_skills():
-    """API endpoint to match skills between CV and job description"""
+    """API endpoint to match CV skills with job skills"""
     try:
         data = request.json
         
         cv_skills = data.get('cv_skills', [])
         job_skills = data.get('job_skills', [])
+        api_key = data.get('api_key', '')
         cv_text = data.get('cv_text', '')
         job_text = data.get('job_text', '')
-        api_key = data.get('api_key', '')
         model = data.get('model', 'gpt-4o-mini')
         
+        if not api_key:
+            return jsonify({'error': 'API key is required'}), 400
+        
         if not cv_skills or not job_skills:
-            return jsonify({'error': 'Both CV and job skills are required'}), 400
+            return jsonify({'error': 'Both CV skills and job skills are required'}), 400
         
         result = match_skills(
             cv_skills=cv_skills,
             job_skills=job_skills,
+            api_key=api_key,
             cv_text=cv_text,
             job_text=job_text,
-            api_key=api_key,
             model=model
         )
         
-        return jsonify(result)
-    
+        if result.get('status') == 'error':
+            return jsonify({
+                'error': result.get('error', 'Error matching skills'),
+                'matched': [],
+                'cv_only': [],
+                'job_only': [],
+                'interesting': []
+            }), 500
+        
+        return jsonify({
+            'matched': result.get('matched', []),
+            'cv_only': result.get('cv_only', []),
+            'job_only': result.get('job_only', []),
+            'interesting': result.get('interesting', []),
+            'stats': result.get('stats', {})
+        })
+        
     except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+        error_info = parse_openai_error(e)
+        return jsonify({
+            'error': error_info['user_message'],
+            'error_code': error_info.get('error_code')
+        }), 500
 
 
 @app.route('/api/assistant', methods=['POST'])
 def api_assistant():
-    """API endpoint for conversational assistant to adjust CV and skills"""
+    """API endpoint for conversational assistant"""
     try:
         data = request.json
         
         user_request = data.get('request', '')
-        session_id = data.get('session_id', 'default')
-        api_key = data.get('api_key', '')
-        model = data.get('model', 'gpt-4o-mini')
-        temperature = float(data.get('temperature', 0.7))
-        language = data.get('language', 'fr')
-        
-        # Context data
         original_cv = data.get('original_cv', '')
         optimized_cv = data.get('optimized_cv', '')
         job_description = data.get('job_description', '')
         cv_skills = data.get('cv_skills', [])
         job_skills = data.get('job_skills', [])
         matched_skills = data.get('matched_skills', {})
+        api_key = data.get('api_key', '')
+        session_id = data.get('session_id', 'default')
+        model = data.get('model', 'gpt-4o-mini')
+        temperature = float(data.get('temperature', 0.7))
+        language = data.get('language', 'fr')
         
         if not api_key:
             return jsonify({'error': 'API key is required'}), 400
         
         if not user_request:
-            return jsonify({'error': 'Request is required'}), 400
+            return jsonify({'error': 'User request is required'}), 400
         
         if not optimized_cv:
-            return jsonify({'error': 'Please generate an optimized CV first'}), 400
+            return jsonify({'error': 'Optimized CV is required'}), 400
         
-        # Process assistant request
-        result = process_assistant_request(
+        # Get or create memory for this session
+        if session_id not in assistant_memory:
+            assistant_memory[session_id] = ConversationBufferMemory(
+                memory_key="chat_history",
+                return_messages=True
+            )
+        
+        memory = assistant_memory[session_id]
+        
+        # Use agent-based assistant
+        result = process_assistant_request_with_agent(
             user_request=user_request,
             original_cv=original_cv,
             optimized_cv=optimized_cv,
@@ -271,76 +322,88 @@ def api_assistant():
             api_key=api_key,
             model=model,
             temperature=temperature,
-            language=language
+            language=language,
+            memory=memory
         )
         
-        if 'error' in result:
-            error_response = {'error': result['error']}
-            if 'error_code' in result:
-                error_response['error_code'] = result['error_code']
-            return jsonify(error_response), 500
+        if result.get('error'):
+            return jsonify({
+                'error': result['error'],
+                'updated_cv': optimized_cv,
+                'explanation': None
+            }), 500
         
-        # Store in history
-        if session_id not in assistant_history:
-            assistant_history[session_id] = []
+        return jsonify({
+            'action': result.get('action'),
+            'updated_cv': result.get('updated_cv', optimized_cv),
+            'explanation': result.get('explanation'),
+            'agent_logs': result.get('agent_logs', [])
+        })
         
-        message = {
-            'id': f"{session_id}_{len(assistant_history[session_id])}",
-            'request': user_request,
-            'response': result,
-            'timestamp': str(os.urandom(8).hex())
-        }
-        
-        assistant_history[session_id].append(message)
-        
-        return jsonify(result)
-    
     except Exception as e:
-        error_msg = str(e)
-        # Try to parse OpenAI errors
-        try:
-            from utils.cv_optimizer import parse_openai_error
-            parsed = parse_openai_error(e)
-            error_msg = parsed.get('user_message', error_msg)
-        except:
-            pass
-        return jsonify({'error': error_msg, 'traceback': traceback.format_exc()}), 500
+        error_info = parse_openai_error(e)
+        return jsonify({
+            'error': error_info['user_message'],
+            'error_code': error_info.get('error_code'),
+            'updated_cv': data.get('optimized_cv', ''),
+            'explanation': None
+        }), 500
 
 
-@app.route('/api/assistant-history', methods=['GET'])
-def api_get_assistant_history():
-    """API endpoint to get assistant conversation history"""
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    """API endpoint to handle file uploads"""
     try:
-        session_id = request.args.get('session_id', 'default')
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
         
-        if session_id not in assistant_history:
-            return jsonify({'history': []})
+        file = request.files['file']
         
-        return jsonify({'history': assistant_history[session_id]})
-    
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'File type not allowed. Only PDF and TXT files are supported.'}), 400
+        
+        if file.content_length and file.content_length > MAX_FILE_SIZE:
+            return jsonify({'error': f'File too large. Maximum size is {MAX_FILE_SIZE / 1024 / 1024}MB'}), 400
+        
+        # Read file content
+        file_content = file.read()
+        
+        # Extract text based on file type
+        if file.filename.lower().endswith('.pdf'):
+            text = extract_text_from_pdf(file_content)
+        else:
+            text = file_content.decode('utf-8', errors='ignore')
+        
+        if not text.strip():
+            return jsonify({'error': 'Could not extract text from file'}), 400
+        
+        word_count = len(text.split())
+        
+        return jsonify({
+            'text': text,
+            'filename': file.filename,
+            'size': len(file_content),
+            'word_count': word_count
+        })
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': f'Error processing file: {str(e)}'
+        }), 500
 
 
-@app.route('/api/assistant-history', methods=['DELETE'])
-def api_clear_assistant_history():
-    """API endpoint to clear assistant history"""
-    try:
-        data = request.json
-        session_id = data.get('session_id', 'default')
-        
-        if session_id in assistant_history:
-            assistant_history[session_id] = []
-        
-        return jsonify({'success': True, 'message': 'Assistant history cleared'})
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@app.route('/api/parse-pdf', methods=['POST'])
+def api_parse_pdf():
+    """API endpoint to parse PDF files (alias for /api/upload for compatibility)"""
+    return api_upload()
 
 
-@app.route('/api/generate-pdf', methods=['POST'])
-def api_generate_pdf():
-    """API endpoint to generate PDF CV with Harvard template"""
+@app.route('/api/download-pdf', methods=['POST'])
+def api_download_pdf():
+    """API endpoint to download CV as PDF"""
     try:
         data = request.json
         cv_text = data.get('cv_text', '')
@@ -348,23 +411,21 @@ def api_generate_pdf():
         if not cv_text:
             return jsonify({'error': 'CV text is required'}), 400
         
-        # Generate PDF
         pdf_buffer = generate_harvard_pdf(cv_text)
         
-        # Return PDF file
-        from flask import Response
-        return Response(
-            pdf_buffer.getvalue(),
+        return send_file(
+            pdf_buffer,
             mimetype='application/pdf',
-            headers={
-                'Content-Disposition': 'attachment; filename=optimized_cv.pdf'
-            }
+            as_attachment=True,
+            download_name='optimized_cv.pdf'
         )
-    
+        
     except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+        return jsonify({
+            'error': f'Error generating PDF: {str(e)}'
+        }), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    app.run(debug=True, port=5001)
 
