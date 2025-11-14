@@ -10,3 +10,5 @@ PyPDF2>=3.0.0
 pdfplumber>=0.10.0
 openai>=1.0.0
 reportlab>=4.0.0
+chromadb>=0.4.0
+scikit-learn>=1.0.0

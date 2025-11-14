@@ -12,6 +12,7 @@ from utils.letter_generator import generate_cover_letter, parse_openai_error
 from utils.skills_matcher import extract_skills, match_skills
 from utils.assistant_agent import process_assistant_request_with_agent
 from utils.pdf_generator import generate_harvard_pdf
+from utils.rag_system import RAGSystem
 
 try:
     from langchain.memory import ConversationBufferMemory
@@ -42,6 +43,9 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # In-memory storage for assistant conversation history
 assistant_memory = {}  # {session_id: ConversationBufferMemory}
+
+# In-memory storage for RAG systems
+rag_systems = {}  # {session_id: RAGSystem}
 
 
 def allowed_file(filename):
@@ -81,8 +85,21 @@ def api_optimize_cv():
         if max_date_years:
             max_date_years = int(max_date_years)
         language = data.get('language', 'fr')
+        session_id = data.get('session_id', 'default')
         
-        # Use agent-based optimization
+        # Get or create RAG system for this session
+        if session_id not in rag_systems:
+            try:
+                rag_systems[session_id] = RAGSystem(api_key=api_key)
+            except Exception as e:
+                return jsonify({
+                    'error': f'Error initializing RAG system: {str(e)}',
+                    'agent_logs': []
+                }), 500
+        
+        rag_system = rag_systems[session_id]
+        
+        # Use agent-based optimization with RAG
         result = optimize_cv_with_agent(
             cv_text=cv_text,
             job_description=job_description,
@@ -92,7 +109,8 @@ def api_optimize_cv():
             min_experiences=min_experiences,
             max_experiences=max_experiences,
             max_date_years=max_date_years,
-            language=language
+            language=language,
+            rag_system=rag_system  # Pass RAG system to agent
         )
         
         if result.get('error'):
@@ -109,6 +127,8 @@ def api_optimize_cv():
             'cv_skills': result.get('cv_skills', []),
             'job_skills': result.get('job_skills', []),
             'skills_comparison': result.get('skills_comparison'),
+            'sources': result.get('sources'),  # NEW: Return RAG sources
+            'rag_details': result.get('rag_details'),  # NEW: Return detailed RAG info for logs
             'model_used': result.get('model_used', model),
             'word_count': result.get('word_count', 0)
         })
@@ -314,7 +334,17 @@ def api_assistant():
         
         memory = assistant_memory[session_id]
         
-        # Use agent-based assistant
+        # Get or create RAG system for this session
+        if session_id not in rag_systems:
+            try:
+                rag_systems[session_id] = RAGSystem(api_key=api_key)
+            except Exception as e:
+                print(f"Warning: Could not initialize RAG system for session {session_id}: {str(e)}")
+                rag_systems[session_id] = None
+        
+        rag_system = rag_systems.get(session_id)
+        
+        # Use agent-based assistant with RAG
         result = process_assistant_request_with_agent(
             user_request=user_request,
             original_cv=original_cv,
@@ -327,7 +357,8 @@ def api_assistant():
             model=model,
             temperature=temperature,
             language=language,
-            memory=memory
+            memory=memory,
+            rag_system=rag_system  # NEW: Pass RAG system
         )
         
         if result.get('error'):
@@ -341,6 +372,7 @@ def api_assistant():
             'action': result.get('action'),
             'updated_cv': result.get('updated_cv', optimized_cv),
             'explanation': result.get('explanation'),
+            'sources': result.get('sources', []),  # NEW: Return RAG sources
             'agent_logs': result.get('agent_logs', [])
         })
         
@@ -432,4 +464,3 @@ def api_download_pdf():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
-

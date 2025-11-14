@@ -12,7 +12,8 @@ const state = {
     skillsMatched: false,
     assistantHistory: [],
     assistantSessionId: 'default',
-    matchedSkillsData: null
+    matchedSkillsData: null,
+    lastExecutionLogs: null  // NEW: Store last execution logs
 };
 
 // DOM Elements
@@ -66,7 +67,14 @@ const elements = {
     // Quick navigation menu
     quickNavToggle: document.getElementById('quick-nav-toggle'),
     quickNavPopup: document.getElementById('quick-nav-popup'),
-    quickNavItems: document.querySelectorAll('.quick-nav-item')
+    quickNavItems: document.querySelectorAll('.quick-nav-item'),
+    // Logs modal
+    viewLogsBtn: document.getElementById('view-logs-btn'),
+    logsModal: document.getElementById('logs-modal'),
+    logsModalClose: document.getElementById('logs-modal-close'),
+    simplifiedLogContent: document.getElementById('simplified-log-text'),
+    fullLogContent: document.getElementById('full-log-text'),
+    logsTabBtns: document.querySelectorAll('.logs-tab-btn')
 };
 
 // Initialize
@@ -268,6 +276,33 @@ function setupEventListeners() {
             elements.errorModal.classList.add('hidden');
         }
     });
+    
+    // Logs modal
+    if (elements.viewLogsBtn) {
+        elements.viewLogsBtn.addEventListener('click', showLogsModal);
+    }
+    if (elements.logsModalClose) {
+        elements.logsModalClose.addEventListener('click', () => {
+            elements.logsModal.classList.add('hidden');
+        });
+    }
+    if (elements.logsModal) {
+        elements.logsModal.addEventListener('click', (e) => {
+            if (e.target === elements.logsModal) {
+                elements.logsModal.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Logs tabs
+    if (elements.logsTabBtns) {
+        elements.logsTabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.logTab;
+                switchLogsTab(tabName);
+            });
+        });
+    }
 
     // History filters
     elements.filterBtns.forEach(btn => {
@@ -647,7 +682,8 @@ async function optimizeCv() {
         temperature: parseFloat(elements.temperatureInput.value),
         min_experiences: parseInt(elements.minExperiences.value),
         max_experiences: parseInt(elements.maxExperiences.value),
-        max_date_years: elements.maxDateYears.value || null
+        max_date_years: elements.maxDateYears.value || null,
+        session_id: state.assistantSessionId || 'default'  // NEW: Add session_id for RAG
     };
 
     try {
@@ -670,6 +706,36 @@ async function optimizeCv() {
         elements.optimizedCvContent.textContent = data.optimized_cv;
         elements.resultsSection.classList.remove('hidden');
         switchTab('optimized-cv');
+        
+        // Display RAG sources if available
+        displayRAGSources(data.sources);
+        
+        // Store logs for the logs modal
+        state.lastExecutionLogs = {
+            agent_logs: data.agent_logs || [],
+            rag_details: data.rag_details || null,
+            model_used: data.model_used || elements.modelSelect?.value || 'N/A',
+            temperature: parseFloat(elements.temperatureInput?.value) || 0.3,
+            word_count: data.word_count || 0,
+            cv_skills: data.cv_skills || [],
+            job_skills: data.job_skills || [],
+            skills_comparison: data.skills_comparison || null
+        };
+        
+        // Show logs button and enable it
+        if (elements.viewLogsBtn) {
+            elements.viewLogsBtn.disabled = false;
+            elements.viewLogsBtn.style.opacity = '1';
+            elements.viewLogsBtn.style.cursor = 'pointer';
+        } else {
+            // Try to re-fetch it
+            elements.viewLogsBtn = document.getElementById('view-logs-btn');
+            if (elements.viewLogsBtn) {
+                elements.viewLogsBtn.disabled = false;
+                elements.viewLogsBtn.style.opacity = '1';
+                elements.viewLogsBtn.style.cursor = 'pointer';
+            }
+        }
         
         // Re-initialize assistant elements now that results section is visible
         if (!elements.assistantSendBtn) {
@@ -1280,6 +1346,11 @@ async function sendAssistantRequest() {
             // Add assistant response
             addAssistantMessage('assistant', responseText, false);
             
+            // Display RAG sources if available
+            if (data.sources && data.sources.length > 0) {
+                displayRAGSourcesInAssistant(data.sources);
+            }
+            
             // Save to history
             state.assistantHistory.push({
                 request: request,
@@ -1719,4 +1790,241 @@ function switchMainTab(tabName) {
     }
     
     console.log('Main tab switched to:', tabName);
+}
+
+// Display RAG sources for optimized CV
+function displayRAGSources(sources) {
+    if (!sources) return;
+    
+    const sourcesSection = document.getElementById('rag-sources-section');
+    const cvSourcesDiv = document.getElementById('rag-cv-sources');
+    const jdSourcesDiv = document.getElementById('rag-jd-sources');
+    
+    if (!sourcesSection || !cvSourcesDiv || !jdSourcesDiv) return;
+    
+    const cvSources = sources.cv_sources || [];
+    const jdSources = sources.jd_sources || [];
+    
+    if (cvSources.length === 0 && jdSources.length === 0) {
+        sourcesSection.classList.add('hidden');
+        return;
+    }
+    
+    // Display CV sources
+    if (cvSources.length > 0) {
+        cvSourcesDiv.innerHTML = cvSources.map((source, index) => 
+            `<div class="rag-source-item">
+                <span class="rag-source-number">${index + 1}</span>
+                <div class="rag-source-text">${escapeHtml(source.substring(0, 200))}${source.length > 200 ? '...' : ''}</div>
+            </div>`
+        ).join('');
+    } else {
+        cvSourcesDiv.innerHTML = '<div class="rag-source-empty">No CV chunks retrieved</div>';
+    }
+    
+    // Display JD sources
+    if (jdSources.length > 0) {
+        jdSourcesDiv.innerHTML = jdSources.map((source, index) => 
+            `<div class="rag-source-item">
+                <span class="rag-source-number">${index + 1}</span>
+                <div class="rag-source-text">${escapeHtml(source.substring(0, 200))}${source.length > 200 ? '...' : ''}</div>
+            </div>`
+        ).join('');
+    } else {
+        jdSourcesDiv.innerHTML = '<div class="rag-source-empty">No JD chunks retrieved</div>';
+    }
+    
+    sourcesSection.classList.remove('hidden');
+}
+
+// Display RAG sources in assistant chat
+function displayRAGSourcesInAssistant(sources) {
+    if (!sources || sources.length === 0) return;
+    
+    const sourcesText = sources.map((source, index) => 
+        `[Source ${index + 1}]: ${source.substring(0, 150)}${source.length > 150 ? '...' : ''}`
+    ).join('\n\n');
+    
+    addAssistantMessage('assistant', `\n\n🔍 Sources used:\n${sourcesText}`, false);
+}
+
+// Show logs modal
+function showLogsModal() {
+    if (!state.lastExecutionLogs) {
+        showError('No execution logs available. Please optimize a CV first.');
+        return;
+    }
+    
+    // Re-fetch elements in case they're not initialized
+    if (!elements.simplifiedLogContent) {
+        elements.simplifiedLogContent = document.getElementById('simplified-log-text');
+    }
+    if (!elements.fullLogContent) {
+        elements.fullLogContent = document.getElementById('full-log-text');
+    }
+    if (!elements.logsModal) {
+        elements.logsModal = document.getElementById('logs-modal');
+    }
+    
+    // Generate simplified log
+    const simplifiedLog = generateSimplifiedLog(state.lastExecutionLogs);
+    if (elements.simplifiedLogContent) {
+        elements.simplifiedLogContent.innerHTML = simplifiedLog;
+    }
+    
+    // Generate full log
+    const fullLog = generateFullLog(state.lastExecutionLogs);
+    if (elements.fullLogContent) {
+        elements.fullLogContent.innerHTML = fullLog;
+    }
+    
+    // Show modal
+    if (elements.logsModal) {
+        elements.logsModal.classList.remove('hidden');
+        switchLogsTab('simplified');
+    }
+}
+
+// Switch logs tab
+function switchLogsTab(tabName) {
+    // Update tab buttons
+    if (elements.logsTabBtns) {
+        elements.logsTabBtns.forEach(btn => {
+            if (btn.dataset.logTab === tabName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+    
+    // Update tab content
+    document.querySelectorAll('.logs-tab-content').forEach(content => {
+        if (content.id === `${tabName}-log-content`) {
+            content.classList.add('active');
+        } else {
+            content.classList.remove('active');
+        }
+    });
+}
+
+// Generate simplified log
+function generateSimplifiedLog(logs) {
+    let html = '<div class="simplified-log">';
+    
+    // Header
+    html += '<div class="log-section"><h3>📋 Execution Summary</h3>';
+    html += `<p><strong>Model:</strong> ${logs.model_used || 'N/A'}</p>`;
+    html += `<p><strong>Temperature:</strong> ${logs.temperature || 'N/A'}</p>`;
+    html += `<p><strong>Word Count:</strong> ${logs.word_count || 0}</p>`;
+    html += '</div>';
+    
+    // RAG Vectorization
+    if (logs.rag_details) {
+        html += '<div class="log-section"><h3>🔍 RAG Vectorization</h3>';
+        
+        // CV Indexing
+        if (logs.rag_details.cv_indexing) {
+            const cvIdx = logs.rag_details.cv_indexing;
+            html += '<div class="log-subsection"><h4>CV Vectorization</h4>';
+            html += `<p>✓ CV split into <strong>${cvIdx.chunks_count}</strong> chunks</p>`;
+            html += `<p>• Total characters: ${cvIdx.total_chars.toLocaleString()}</p>`;
+            html += `<p>• Average chunk size: ${Math.round(cvIdx.avg_chunk_size)} characters</p>`;
+            if (cvIdx.chunk_sizes && cvIdx.chunk_sizes.length > 0) {
+                html += `<p>• Chunk size range: ${Math.min(...cvIdx.chunk_sizes)} - ${Math.max(...cvIdx.chunk_sizes)} characters</p>`;
+            }
+            html += '</div>';
+        }
+        
+        // JD Indexing
+        if (logs.rag_details.jd_indexing) {
+            const jdIdx = logs.rag_details.jd_indexing;
+            html += '<div class="log-subsection"><h4>Job Description Vectorization</h4>';
+            html += `<p>✓ Job description split into <strong>${jdIdx.chunks_count}</strong> chunks</p>`;
+            html += `<p>• Total characters: ${jdIdx.total_chars.toLocaleString()}</p>`;
+            html += `<p>• Average chunk size: ${Math.round(jdIdx.avg_chunk_size)} characters</p>`;
+            if (jdIdx.chunk_sizes && jdIdx.chunk_sizes.length > 0) {
+                html += `<p>• Chunk size range: ${Math.min(...jdIdx.chunk_sizes)} - ${Math.max(...jdIdx.chunk_sizes)} characters</p>`;
+            }
+            html += '</div>';
+        }
+        
+        // Retrieval
+        if (logs.rag_details.retrieval) {
+            const ret = logs.rag_details.retrieval;
+            html += '<div class="log-subsection"><h4>Semantic Search & Retrieval</h4>';
+            const query = ret.query || '';
+            html += `<p>✓ Query: "${escapeHtml(query.substring(0, 100))}${query.length > 100 ? '...' : ''}"</p>`;
+            html += `<p>• Retrieved <strong>${ret.cv_chunks_details?.length || 0}</strong> CV chunks (top ${ret.k_cv || 5})</p>`;
+            html += `<p>• Retrieved <strong>${ret.jd_chunks_details?.length || 0}</strong> JD chunks (top ${ret.k_jd || 3})</p>`;
+            
+            // CV Chunks with scores
+            if (ret.cv_chunks_details && ret.cv_chunks_details.length > 0) {
+                html += '<div class="chunks-list"><h5>CV Chunks (Cosine Similarity):</h5><ul>';
+                ret.cv_chunks_details.forEach((chunk) => {
+                    const score = chunk.similarity_score ? (chunk.similarity_score * 100).toFixed(1) : 'N/A';
+                    html += `<li>Chunk ${chunk.index || 'N/A'}: <strong>${score}%</strong> similarity`;
+                    const content = chunk.content || '';
+                    html += `<div class="chunk-preview">${escapeHtml(content.substring(0, 150))}${content.length > 150 ? '...' : ''}</div></li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            // JD Chunks with scores
+            if (ret.jd_chunks_details && ret.jd_chunks_details.length > 0) {
+                html += '<div class="chunks-list"><h5>JD Chunks (Cosine Similarity):</h5><ul>';
+                ret.jd_chunks_details.forEach((chunk) => {
+                    const score = chunk.similarity_score ? (chunk.similarity_score * 100).toFixed(1) : 'N/A';
+                    html += `<li>Chunk ${chunk.index || 'N/A'}: <strong>${score}%</strong> similarity`;
+                    const content = chunk.content || '';
+                    html += `<div class="chunk-preview">${escapeHtml(content.substring(0, 150))}${content.length > 150 ? '...' : ''}</div></li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    }
+    
+    // Skills
+    if (logs.cv_skills && logs.cv_skills.length > 0) {
+        html += '<div class="log-section"><h3>💼 Skills Extraction</h3>';
+        html += `<p>✓ Extracted <strong>${logs.cv_skills.length}</strong> CV skills</p>`;
+        if (logs.job_skills && logs.job_skills.length > 0) {
+            html += `<p>✓ Extracted <strong>${logs.job_skills.length}</strong> job skills</p>`;
+        }
+        if (logs.skills_comparison) {
+            const comp = logs.skills_comparison;
+            html += `<p>• Matched: ${comp.matched?.length || 0} skills</p>`;
+            html += `<p>• Missing: ${comp.job_only?.length || 0} skills</p>`;
+            if (comp.stats && comp.stats.avg_similarity) {
+                html += `<p>• Average similarity: <strong>${(comp.stats.avg_similarity * 100).toFixed(1)}%</strong></p>`;
+            }
+        }
+        html += '</div>';
+    }
+    
+    // Agent Steps
+    if (logs.agent_logs && logs.agent_logs.length > 0) {
+        html += '<div class="log-section"><h3>⚙️ Agent Execution Steps</h3><ul class="agent-steps">';
+        logs.agent_logs.forEach(log => {
+            html += `<li>${escapeHtml(log)}</li>`;
+        });
+        html += '</ul></div>';
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+// Generate full log (JSON format)
+function generateFullLog(logs) {
+    let html = '<div class="full-log">';
+    html += '<pre class="json-log">';
+    html += escapeHtml(JSON.stringify(logs, null, 2));
+    html += '</pre>';
+    html += '</div>';
+    return html;
 }

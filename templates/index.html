@@ -222,6 +222,10 @@
                     <span class="btn-icon">✉️</span>
                     Generate Cover Letter
                 </button>
+                <button id="view-logs-btn" class="btn-secondary" style="margin-top: 0.5rem; width: 100%;" disabled>
+                    <span class="btn-icon">📊</span>
+                    View Execution Logs
+                </button>
             </section>
 
             <!-- Results Section -->
@@ -240,6 +244,20 @@
                         <button class="btn-download" data-download="optimized-cv">💾 Download</button>
                     </div>
                     <div class="result-content" id="optimized-cv-content"></div>
+                    <!-- RAG Sources Section -->
+                    <div id="rag-sources-section" class="rag-sources-section hidden">
+                        <h3 class="rag-sources-title">🔍 Sources Used (RAG)</h3>
+                        <div class="rag-sources-container">
+                            <div class="rag-source-group">
+                                <h4>CV Chunks</h4>
+                                <div id="rag-cv-sources" class="rag-sources-list"></div>
+                            </div>
+                            <div class="rag-source-group">
+                                <h4>Job Description Chunks</h4>
+                                <div id="rag-jd-sources" class="rag-sources-list"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="cover-letter-tab">
@@ -369,6 +387,28 @@
                     <span class="quick-nav-item-icon">📚</span>
                     <span class="quick-nav-item-text">History</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logs-modal" class="modal hidden">
+        <div class="modal-content logs-modal-content">
+            <div class="modal-header">
+                <h2>📊 Execution Logs</h2>
+                <button id="logs-modal-close" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="logs-tabs">
+                    <button class="logs-tab-btn active" data-log-tab="simplified">Simplified Log</button>
+                    <button class="logs-tab-btn" data-log-tab="full">Full Log</button>
+                </div>
+                <div class="logs-tab-content active" id="simplified-log-content">
+                    <div id="simplified-log-text" class="log-text"></div>
+                </div>
+                <div class="logs-tab-content" id="full-log-content">
+                    <div id="full-log-text" class="log-text"></div>
+                </div>
             </div>
         </div>
     </div>

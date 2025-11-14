@@ -2,11 +2,13 @@
 Tools for the agents - Functions that can be called by agents
 """
 from langchain_core.tools import tool
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
 import re
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 
 @tool
@@ -236,6 +238,144 @@ Format: ["skill1", "skill2", ...]"""
     except Exception as e:
         return {
             "matched": [],
+            "cv_only": [],
+            "job_only": [],
+            "interesting": [],
+            "stats": {},
+            "status": "error",
+            "error": str(e)
+        }
+
+
+@tool
+def compare_skills_tool_with_rag(
+    cv_skills: List[str], 
+    job_skills: List[str], 
+    api_key: str,
+    cv_vectorstore: Optional[Any] = None,
+    jd_vectorstore: Optional[Any] = None,
+    similarity_threshold: float = 0.7
+) -> Dict[str, Any]:
+    """
+    Compare CV skills with job description skills using RAG and cosine similarity.
+    Uses embeddings and semantic search for more accurate matching.
+    
+    Args:
+        cv_skills: List of skills from the CV
+        job_skills: List of skills from the job description
+        api_key: OpenAI API key for embeddings
+        cv_vectorstore: Optional CV vector store for semantic search
+        jd_vectorstore: Optional JD vector store for semantic search
+        similarity_threshold: Threshold for cosine similarity (default 0.7)
+    
+    Returns:
+        Dictionary with 'matched' (matching skills with similarity scores), 
+        'job_only' (missing skills), 'cv_only' (CV-only skills), 
+        and 'interesting' (interesting CV skills)
+    """
+    try:
+        from langchain_openai import OpenAIEmbeddings
+        
+        # Initialize embeddings
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            api_key=api_key
+        )
+        
+        # Vectorize skills
+        if not cv_skills or not job_skills:
+            return {
+                "matched": [],
+                "cv_only": cv_skills.copy() if cv_skills else [],
+                "job_only": job_skills.copy() if job_skills else [],
+                "interesting": [],
+                "stats": {},
+                "status": "error",
+                "error": "Empty skills list"
+            }
+        
+        # Generate embeddings for skills
+        cv_skill_vectors = embeddings.embed_documents(cv_skills)
+        jd_skill_vectors = embeddings.embed_documents(job_skills)
+        
+        # Convert to numpy arrays
+        cv_vectors = np.array(cv_skill_vectors)
+        jd_vectors = np.array(jd_skill_vectors)
+        
+        # Calculate cosine similarity matrix
+        similarity_matrix = cosine_similarity(cv_vectors, jd_vectors)
+        
+        # Find matches above threshold
+        matched = []
+        matched_cv_indices = set()
+        matched_jd_indices = set()
+        
+        for i, cv_skill in enumerate(cv_skills):
+            for j, jd_skill in enumerate(job_skills):
+                similarity = float(similarity_matrix[i][j])
+                if similarity >= similarity_threshold:
+                    matched.append({
+                        "cv_skill": cv_skill,
+                        "job_skill": jd_skill,
+                        "similarity": round(similarity, 3),
+                        "match_type": "semantic"
+                    })
+                    matched_cv_indices.add(i)
+                    matched_jd_indices.add(j)
+        
+        # Find CV-only skills (not matched)
+        cv_only = [
+            cv_skills[i] for i in range(len(cv_skills)) 
+            if i not in matched_cv_indices
+        ]
+        
+        # Find job-only skills (missing from CV)
+        # Use semantic search in CV vectorstore if available
+        job_only = []
+        if cv_vectorstore:
+            for j, jd_skill in enumerate(job_skills):
+                if j not in matched_jd_indices:
+                    # Search in CV vectorstore
+                    results = cv_vectorstore.similarity_search_with_score(jd_skill, k=1)
+                    if not results or results[0][1] < similarity_threshold:
+                        job_only.append(jd_skill)
+        else:
+            # Fallback: skills not matched
+            job_only = [
+                job_skills[j] for j in range(len(job_skills))
+                if j not in matched_jd_indices
+            ]
+        
+        # Identify interesting CV skills using semantic search in JD vectorstore
+        interesting = []
+        if cv_only and jd_vectorstore:
+            for cv_skill in cv_only[:20]:  # Limit to avoid too many API calls
+                results = jd_vectorstore.similarity_search_with_score(cv_skill, k=1)
+                if results and results[0][1] >= similarity_threshold:
+                    interesting.append(cv_skill)
+        
+        return {
+            "matched": [m["cv_skill"] for m in matched],
+            "matched_details": matched,  # Includes similarity scores
+            "cv_only": [s for s in cv_only if s not in interesting],
+            "job_only": job_only,
+            "interesting": interesting,
+            "stats": {
+                "total_cv": len(cv_skills),
+                "total_job": len(job_skills),
+                "matched_count": len(matched),
+                "missing_count": len(job_only),
+                "cv_only_count": len([s for s in cv_only if s not in interesting]),
+                "interesting_count": len(interesting),
+                "match_percentage": round((len(matched) / len(job_skills) * 100) if job_skills else 0, 1),
+                "avg_similarity": round(np.mean([m["similarity"] for m in matched]), 3) if matched else 0.0
+            },
+            "status": "success"
+        }
+    except Exception as e:
+        return {
+            "matched": [],
+            "matched_details": [],
             "cv_only": [],
             "job_only": [],
             "interesting": [],

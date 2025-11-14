@@ -9,8 +9,10 @@ from langgraph.graph import StateGraph, END
 from utils.tools import (
     analyze_cv_structure_tool,
     extract_skills_tool,
-    compare_skills_tool
+    compare_skills_tool,
+    compare_skills_tool_with_rag
 )
+from utils.rag_system import RAGSystem
 
 
 class CVOptimizationState(TypedDict):
@@ -31,8 +33,13 @@ class CVOptimizationState(TypedDict):
     job_skills: List[str]
     skills_comparison: Optional[Dict[str, Any]]
     
+    # RAG components
+    rag_system: Optional[Any]  # RAGSystem instance
+    
     # Final result
     optimized_cv: Optional[str]
+    sources: Optional[Dict[str, List[str]]]  # Sources used for generation
+    rag_details: Optional[Dict[str, Any]]  # NEW: Detailed RAG information for logging
     error: Optional[str]
     agent_logs: List[str]
 
@@ -86,17 +93,74 @@ def extract_job_skills(state: CVOptimizationState) -> CVOptimizationState:
         return state
 
 
-def compare_skills(state: CVOptimizationState) -> CVOptimizationState:
-    """Node 4: Compare CV skills with job skills"""
+def index_cv_in_rag(state: CVOptimizationState) -> CVOptimizationState:
+    """Node 2.5: Index CV in vector database"""
     try:
-        result = compare_skills_tool.invoke({
-            "cv_skills": state["cv_skills"],
-            "job_skills": state["job_skills"],
-            "api_key": state["api_key"],
-            "cv_text": state["cv_text"],
-            "job_text": state["job_description"],
-            "model": state["model"]
-        })
+        if state.get("rag_system"):
+            indexing_info = state["rag_system"].index_cv(state["cv_text"], session_id="cv")
+            state["agent_logs"].append(f"✓ Indexed CV in vector database: {indexing_info['chunks_count']} chunks")
+            # Store indexing info for detailed logs
+            if not state.get("rag_details"):
+                state["rag_details"] = {}
+            state["rag_details"]["cv_indexing"] = indexing_info
+        else:
+            state["agent_logs"].append("⚠ RAG system not available, skipping CV indexing")
+        return state
+    except Exception as e:
+        state["agent_logs"].append(f"✗ Error indexing CV in RAG: {str(e)}")
+        # Don't fail the workflow, just log the error
+        return state
+
+
+def index_jd_in_rag(state: CVOptimizationState) -> CVOptimizationState:
+    """Node 3.5: Index Job Description in vector database"""
+    try:
+        if state.get("rag_system"):
+            indexing_info = state["rag_system"].index_jd(state["job_description"], session_id="jd")
+            state["agent_logs"].append(f"✓ Indexed job description in vector database: {indexing_info['chunks_count']} chunks")
+            # Store indexing info for detailed logs
+            if not state.get("rag_details"):
+                state["rag_details"] = {}
+            state["rag_details"]["jd_indexing"] = indexing_info
+        else:
+            state["agent_logs"].append("⚠ RAG system not available, skipping JD indexing")
+        return state
+    except Exception as e:
+        state["agent_logs"].append(f"✗ Error indexing JD in RAG: {str(e)}")
+        # Don't fail the workflow, just log the error
+        return state
+
+
+def compare_skills(state: CVOptimizationState) -> CVOptimizationState:
+    """Node 4: Compare CV skills with job skills using RAG + cosine similarity"""
+    try:
+        rag_system = state.get("rag_system")
+        cv_vectorstore = rag_system.cv_vectorstore if rag_system else None
+        jd_vectorstore = rag_system.jd_vectorstore if rag_system else None
+        
+        # Use RAG-based comparison if available, fallback to original
+        if rag_system and cv_vectorstore and jd_vectorstore:
+            result = compare_skills_tool_with_rag.invoke({
+                "cv_skills": state["cv_skills"],
+                "job_skills": state["job_skills"],
+                "api_key": state["api_key"],
+                "cv_vectorstore": cv_vectorstore,
+                "jd_vectorstore": jd_vectorstore,
+                "similarity_threshold": 0.7
+            })
+            state["agent_logs"].append("✓ Compared skills using RAG + cosine similarity")
+        else:
+            # Fallback to original method
+            result = compare_skills_tool.invoke({
+                "cv_skills": state["cv_skills"],
+                "job_skills": state["job_skills"],
+                "api_key": state["api_key"],
+                "cv_text": state["cv_text"],
+                "job_text": state["job_description"],
+                "model": state["model"]
+            })
+            state["agent_logs"].append("✓ Compared skills using traditional method")
+        
         state["skills_comparison"] = result
         matched_count = len(result.get("matched", []))
         missing_count = len(result.get("job_only", []))
@@ -109,7 +173,7 @@ def compare_skills(state: CVOptimizationState) -> CVOptimizationState:
 
 
 def generate_optimized_cv(state: CVOptimizationState) -> CVOptimizationState:
-    """Node 5: Generate optimized CV using LLM"""
+    """Node 5: Generate optimized CV using LLM with RAG retrieval"""
     try:
         llm = ChatOpenAI(
             model=state["model"],
@@ -147,6 +211,52 @@ Skills Analysis:
         }
         target_language = language_names.get(state["language"], "French (Français)")
         
+        # RAG retrieval if available
+        rag_context = ""
+        cv_sources = []
+        jd_sources = []
+        
+        rag_system = state.get("rag_system")
+        if rag_system:
+            try:
+                # Retrieve relevant chunks using job description as query
+                rag_result = rag_system.get_context_with_sources(
+                    query=state["job_description"],
+                    k_cv=5,
+                    k_jd=3
+                )
+                
+                cv_context = rag_result.get("cv_context", "")
+                jd_context = rag_result.get("jd_context", "")
+                cv_sources = rag_result.get("cv_sources", [])
+                jd_sources = rag_result.get("jd_sources", [])
+                
+                if cv_context or jd_context:
+                    rag_context = f"""
+Relevant CV sections (from semantic search):
+{cv_context}
+
+Relevant job requirements (from semantic search):
+{jd_context}
+
+IMPORTANT: Use information from the chunks above. These are the most relevant parts of the CV and job description for this optimization.
+"""
+                    state["agent_logs"].append(f"✓ Retrieved {len(cv_sources)} CV chunks and {len(jd_sources)} JD chunks using RAG")
+                    
+                    # Store detailed RAG info for logging
+                    if not state.get("rag_details"):
+                        state["rag_details"] = {}
+                    state["rag_details"]["retrieval"] = {
+                        "query": rag_result.get("query", state["job_description"]),
+                        "cv_chunks_details": rag_result.get("cv_chunks_details", []),
+                        "jd_chunks_details": rag_result.get("jd_chunks_details", []),
+                        "k_cv": 5,
+                        "k_jd": 3
+                    }
+            except Exception as e:
+                state["agent_logs"].append(f"⚠ RAG retrieval failed: {str(e)}, using full text")
+                rag_context = ""
+        
         system_message = f"""You are an expert CV/resume optimizer. Your task is to tailor a candidate's CV to match a specific job description while maintaining authenticity and truthfulness.
 
 CRITICAL: The entire CV must be written in {target_language}. All sections, descriptions, and content must be in this language.
@@ -162,12 +272,14 @@ Guidelines:
 - Remove or de-emphasize irrelevant information
 - Use industry-standard terminology from the job description where appropriate
 - Write everything in {target_language} - section headers, descriptions, and all text
+- When RAG context is provided, prioritize information from those chunks as they are the most relevant
 
 Use the skills analysis to emphasize matching skills and address missing skills naturally in the content."""
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_message),
-            ("human", """Job Description:
+            ("human", """{rag_context}
+Job Description:
 {job_description}
 
 Original CV:
@@ -176,12 +288,13 @@ Original CV:
 {cv_structure_info}
 {skills_info}
 
-Create an optimized CV tailored to this job description. Maintain all factual information but reorganize and rephrase to maximize relevance and impact.""")
+Create an optimized CV tailored to this job description. Maintain all factual information but reorganize and rephrase to maximize relevance and impact. If RAG context is provided, use it as the primary source of information.""")
         ])
         
         chain = prompt | llm
         
         response = chain.invoke({
+            "rag_context": rag_context,
             "job_description": state["job_description"],
             "cv_text": state["cv_text"],
             "cv_structure_info": cv_structure_info,
@@ -189,7 +302,11 @@ Create an optimized CV tailored to this job description. Maintain all factual in
         })
         
         state["optimized_cv"] = response.content.strip()
-        state["agent_logs"].append(f"✓ Generated optimized CV ({len(state['optimized_cv'].split())} words)")
+        state["sources"] = {
+            "cv_sources": cv_sources,
+            "jd_sources": jd_sources
+        }
+        state["agent_logs"].append(f"✓ Generated optimized CV ({len(state['optimized_cv'].split())} words) with RAG context")
         return state
         
     except Exception as e:
@@ -199,23 +316,27 @@ Create an optimized CV tailored to this job description. Maintain all factual in
 
 
 def create_cv_optimization_agent() -> StateGraph:
-    """Create the LangGraph workflow for CV optimization"""
+    """Create the LangGraph workflow for CV optimization with RAG"""
     workflow = StateGraph(CVOptimizationState)
     
     # Add nodes
     workflow.add_node("analyze_structure", analyze_structure)
     workflow.add_node("extract_cv_skills", extract_cv_skills)
+    workflow.add_node("index_cv_rag", index_cv_in_rag)  # NEW: Index CV in RAG
     workflow.add_node("extract_job_skills", extract_job_skills)
+    workflow.add_node("index_jd_rag", index_jd_in_rag)  # NEW: Index JD in RAG
     workflow.add_node("compare_skills", compare_skills)
     workflow.add_node("generate_cv", generate_optimized_cv)
     
     # Set entry point
     workflow.set_entry_point("analyze_structure")
     
-    # Add edges (sequential workflow)
+    # Add edges (sequential workflow with RAG nodes)
     workflow.add_edge("analyze_structure", "extract_cv_skills")
-    workflow.add_edge("extract_cv_skills", "extract_job_skills")
-    workflow.add_edge("extract_job_skills", "compare_skills")
+    workflow.add_edge("extract_cv_skills", "index_cv_rag")  # NEW: After CV skills extraction
+    workflow.add_edge("index_cv_rag", "extract_job_skills")
+    workflow.add_edge("extract_job_skills", "index_jd_rag")  # NEW: After JD skills extraction
+    workflow.add_edge("index_jd_rag", "compare_skills")
     workflow.add_edge("compare_skills", "generate_cv")
     workflow.add_edge("generate_cv", END)
     
@@ -232,6 +353,7 @@ def optimize_cv_with_agent(
     max_experiences: int = 8,
     max_date_years: Optional[int] = None,
     language: str = "fr",
+    rag_system: Optional[Any] = None,  # NEW: RAG system parameter
 ) -> Dict[str, Any]:
     """
     Optimize CV using the agent-based workflow.
@@ -253,7 +375,10 @@ def optimize_cv_with_agent(
         "cv_skills": [],
         "job_skills": [],
         "skills_comparison": None,
+        "rag_system": rag_system,  # NEW: Include RAG system in state
         "optimized_cv": None,
+        "sources": None,  # NEW: Sources will be populated by generate_optimized_cv
+        "rag_details": None,  # NEW: Detailed RAG information
         "error": None,
         "agent_logs": []
     }
@@ -276,6 +401,8 @@ def optimize_cv_with_agent(
             "cv_skills": final_state.get("cv_skills", []),
             "job_skills": final_state.get("job_skills", []),
             "skills_comparison": final_state.get("skills_comparison"),
+            "sources": final_state.get("sources"),  # NEW: Return sources
+            "rag_details": final_state.get("rag_details"),  # NEW: Return detailed RAG info
             "model_used": model,
             "temperature": temperature,
             "word_count": len(final_state.get("optimized_cv", "").split()) if final_state.get("optimized_cv") else 0

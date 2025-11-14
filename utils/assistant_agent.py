@@ -122,7 +122,8 @@ def process_assistant_request_with_agent(
     model: str = "gpt-4o-mini",
     temperature: float = 0.7,
     language: str = "fr",
-    memory: Optional[ConversationBufferMemory] = None
+    memory: Optional[ConversationBufferMemory] = None,
+    rag_system: Optional[Any] = None  # NEW: RAG system parameter
 ) -> Dict[str, Any]:
     """
     Process assistant request using a ReAct agent with tools and memory.
@@ -143,6 +144,36 @@ def process_assistant_request_with_agent(
         
         # Create tools for the agent
         tools = create_assistant_tools(api_key)
+        
+        # RAG retrieval if available
+        rag_context = ""
+        sources = []
+        if rag_system:
+            try:
+                # Retrieve relevant chunks using user request as query
+                rag_result = rag_system.get_context_with_sources(
+                    query=user_request,
+                    k_cv=3,
+                    k_jd=2
+                )
+                
+                cv_context = rag_result.get("cv_context", "")
+                jd_context = rag_result.get("jd_context", "")
+                cv_sources = rag_result.get("cv_sources", [])
+                jd_sources = rag_result.get("jd_sources", [])
+                
+                if cv_context or jd_context:
+                    rag_context = f"""
+Relevant context from semantic search:
+CV chunks: {cv_context}
+Job description chunks: {jd_context}
+
+Use this context to better understand the user's request and provide accurate responses.
+"""
+                    sources = cv_sources + jd_sources
+            except Exception as e:
+                print(f"RAG retrieval failed: {str(e)}")
+                rag_context = ""
         
         # Add context variables that tools can access
         context_vars = {
@@ -189,6 +220,7 @@ def process_assistant_request_with_agent(
                 # Prepare input with context
                 input_text = f"""You are a helpful assistant that helps users refine their optimized CV and correct skills detection.
 
+{rag_context}
 Context:
 - Current Optimized CV: {optimized_cv[:1000]}...
 - Original CV: {original_cv[:500]}...
@@ -245,6 +277,7 @@ Analyze the user's request and use the appropriate tools to make the changes."""
                     "action": "update_cv",
                     "updated_cv": updated_cv,
                     "explanation": explanation,
+                    "sources": sources,  # NEW: Return RAG sources
                     "agent_logs": [explanation]
                 }
             except Exception as agent_error:
@@ -288,7 +321,8 @@ IMPORTANT: The optimized_cv variable contains the current CV text. Use it when c
             prompt = ChatPromptTemplate.from_messages([
                 ("system", system_message),
                 MessagesPlaceholder(variable_name="chat_history"),
-                ("human", """Current optimized CV:
+                ("human", """{rag_context}
+Current optimized CV:
 {optimized_cv}
 
 User Request: {user_request}
@@ -301,6 +335,7 @@ Analyze the request. If you need to use tools, describe which tool and how. Then
             chat_history = memory.chat_memory.messages if hasattr(memory, 'chat_memory') else []
             
             response = chain.invoke({
+                "rag_context": rag_context,
                 "optimized_cv": optimized_cv,
                 "user_request": user_request,
                 "chat_history": chat_history
@@ -329,6 +364,7 @@ Analyze the request. If you need to use tools, describe which tool and how. Then
                 "action": "update_cv",
                 "updated_cv": updated_cv,
                 "explanation": explanation,
+                "sources": sources,  # NEW: Return RAG sources
                 "agent_logs": [explanation]
             }
         
