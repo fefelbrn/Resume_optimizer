@@ -6,6 +6,15 @@ A comprehensive CV optimization and cover letter generation application built wi
 
 This project is a complete rewrite of a CV optimizer application, restructured from the ground up to leverage LangChain's agent framework and LangGraph's workflow capabilities. We've eliminated all fallback implementations and built a pure agent-based system that uses tools, state management, and conversational memory.
 
+## 📹 Video Demonstrations
+
+We've created two video presentations to showcase the application:
+
+- **Frontend Presentation**: [Watch on YouTube](https://www.youtube.com/watch?v=38EIjO1rtUs) - Demonstrates the user interface, features, and user experience of the CV optimizer application
+- **Backend Presentation**: [Watch on YouTube](https://www.youtube.com/watch?v=41vr0_noGPg) - Explains the technical architecture, agent-based system, and implementation details
+
+These videos provide a comprehensive overview of both the frontend functionality and the backend architecture. Watch them to get a complete understanding of how the system works!
+
 ## Architecture
 
 ### Why We Chose This Architecture
