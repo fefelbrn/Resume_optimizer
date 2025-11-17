@@ -401,10 +401,16 @@
             <div class="modal-body">
                 <div class="logs-tabs">
                     <button class="logs-tab-btn active" data-log-tab="simplified">Simplified Log</button>
+                    <button class="logs-tab-btn" data-log-tab="graph">Graph Visualization</button>
                     <button class="logs-tab-btn" data-log-tab="full">Full Log</button>
                 </div>
                 <div class="logs-tab-content active" id="simplified-log-content">
                     <div id="simplified-log-text" class="log-text"></div>
+                </div>
+                <div class="logs-tab-content" id="graph-log-content">
+                    <div id="graph-log-text" class="log-text">
+                        <div id="mermaid-graph" class="mermaid-container"></div>
+                    </div>
                 </div>
                 <div class="logs-tab-content" id="full-log-content">
                     <div id="full-log-text" class="log-text"></div>
@@ -413,6 +419,8 @@
         </div>
     </div>
 
+    <!-- Mermaid.js for graph visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

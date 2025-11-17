@@ -461,7 +461,8 @@ def update_cv_section_tool(cv_text: str, section_name: str, new_content: str) ->
             "experience": ["experience", "work experience", "professional experience"],
             "education": ["education", "academic", "qualifications"],
             "skills": ["skills", "competencies", "technical skills"],
-            "summary": ["summary", "profile", "objective"]
+            "summary": ["summary", "profile", "objective"],
+            "certifications": ["certifications", "certification", "certificates", "certificate"]
         }
         
         patterns = section_patterns.get(section_name.lower(), [section_name.lower()])
@@ -478,9 +479,20 @@ def update_cv_section_tool(cv_text: str, section_name: str, new_content: str) ->
                     continue
             
             if in_section:
+                # Check if we've reached the next section
+                # A new section is indicated by:
+                # 1. A short line (likely a section header)
+                # 2. That is uppercase or title case
+                # 3. And is not empty
                 if i < len(lines) - 1:
-                    next_line = lines[i + 1].lower().strip()
-                    if len(next_line) < 50 and (next_line.isupper() or next_line.istitle()):
+                    next_line = lines[i + 1].strip()
+                    next_line_lower = next_line.lower()
+                    # Check if next line looks like a section header
+                    if (len(next_line) < 50 and 
+                        next_line and 
+                        (next_line.isupper() or 
+                         (next_line[0].isupper() and len(next_line.split()) <= 5) or
+                         any(pattern in next_line_lower for pattern in ["experience", "education", "skills", "summary", "certification", "projects", "languages"]))):
                         in_section = False
                 continue
             

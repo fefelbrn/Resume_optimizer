@@ -70,4 +70,3 @@ def match_skills(
     })
     
     return result
-

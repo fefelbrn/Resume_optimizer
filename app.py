@@ -20,16 +20,37 @@ except ImportError:
     try:
         from langchain_core.memory import ConversationBufferMemory
     except ImportError:
-        # Simple fallback
+        # Try to import message types for proper fallback
+        try:
+            from langchain_core.messages import HumanMessage, AIMessage
+        except ImportError:
+            # If message types not available, create simple compatible classes
+            class HumanMessage:
+                def __init__(self, content):
+                    self.content = content
+                    self.type = "human"
+            
+            class AIMessage:
+                def __init__(self, content):
+                    self.content = content
+                    self.type = "ai"
+        
+        # Simple fallback with proper message types
+        class SimpleChatMemory:
+            def __init__(self):
+                self.messages = []
+            
+            def add_user_message(self, msg):
+                self.messages.append(HumanMessage(msg))
+            
+            def add_ai_message(self, msg):
+                self.messages.append(AIMessage(msg))
+        
         class ConversationBufferMemory:
             def __init__(self, memory_key="chat_history", return_messages=True):
                 self.memory_key = memory_key
                 self.return_messages = return_messages
-                self.chat_memory = type('obj', (object,), {
-                    'messages': [],
-                    'add_user_message': lambda self, msg: self.messages.append(type('obj', (object,), {'content': msg, 'type': 'human'})()),
-                    'add_ai_message': lambda self, msg: self.messages.append(type('obj', (object,), {'content': msg, 'type': 'ai'})())
-                })()
+                self.chat_memory = SimpleChatMemory()
 
 app = Flask(__name__)
 CORS(app)
@@ -129,6 +150,7 @@ def api_optimize_cv():
             'skills_comparison': result.get('skills_comparison'),
             'sources': result.get('sources'),  # NEW: Return RAG sources
             'rag_details': result.get('rag_details'),  # NEW: Return detailed RAG info for logs
+            'graph_structure': result.get('graph_structure'),  # NEW: Return graph structure for visualization
             'model_used': result.get('model_used', model),
             'word_count': result.get('word_count', 0)
         })

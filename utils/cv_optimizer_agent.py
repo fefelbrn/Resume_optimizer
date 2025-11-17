@@ -395,6 +395,63 @@ def optimize_cv_with_agent(
                 "agent_logs": final_state.get("agent_logs", [])
             }
         
+        # Build graph structure information
+        graph_structure = {
+            "nodes": [
+                {
+                    "id": "analyze_structure",
+                    "name": "Analyze Structure",
+                    "description": "Analyzes CV structure and identifies sections",
+                    "tools": ["analyze_cv_structure_tool"]
+                },
+                {
+                    "id": "extract_cv_skills",
+                    "name": "Extract CV Skills",
+                    "description": "Extracts skills from the CV text",
+                    "tools": ["extract_skills_tool"]
+                },
+                {
+                    "id": "index_cv_rag",
+                    "name": "Index CV in RAG",
+                    "description": "Indexes CV chunks in vector database",
+                    "tools": []
+                },
+                {
+                    "id": "extract_job_skills",
+                    "name": "Extract Job Skills",
+                    "description": "Extracts required skills from job description",
+                    "tools": ["extract_skills_tool"]
+                },
+                {
+                    "id": "index_jd_rag",
+                    "name": "Index JD in RAG",
+                    "description": "Indexes job description chunks in vector database",
+                    "tools": []
+                },
+                {
+                    "id": "compare_skills",
+                    "name": "Compare Skills",
+                    "description": "Compares CV and job skills, identifies matches and gaps",
+                    "tools": ["compare_skills_tool", "compare_skills_tool_with_rag"]
+                },
+                {
+                    "id": "generate_cv",
+                    "name": "Generate Optimized CV",
+                    "description": "Generates the final optimized CV using LLM",
+                    "tools": []
+                }
+            ],
+            "edges": [
+                {"from": "analyze_structure", "to": "extract_cv_skills"},
+                {"from": "extract_cv_skills", "to": "index_cv_rag"},
+                {"from": "index_cv_rag", "to": "extract_job_skills"},
+                {"from": "extract_job_skills", "to": "index_jd_rag"},
+                {"from": "index_jd_rag", "to": "compare_skills"},
+                {"from": "compare_skills", "to": "generate_cv"}
+            ],
+            "execution_order": ["analyze_structure", "extract_cv_skills", "index_cv_rag", "extract_job_skills", "index_jd_rag", "compare_skills", "generate_cv"]
+        }
+        
         return {
             "optimized_cv": final_state.get("optimized_cv"),
             "agent_logs": final_state.get("agent_logs", []),
@@ -403,6 +460,7 @@ def optimize_cv_with_agent(
             "skills_comparison": final_state.get("skills_comparison"),
             "sources": final_state.get("sources"),  # NEW: Return sources
             "rag_details": final_state.get("rag_details"),  # NEW: Return detailed RAG info
+            "graph_structure": graph_structure,  # NEW: Return graph structure
             "model_used": model,
             "temperature": temperature,
             "word_count": len(final_state.get("optimized_cv", "").split()) if final_state.get("optimized_cv") else 0

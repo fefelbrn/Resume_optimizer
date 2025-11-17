@@ -26,16 +26,37 @@ except ImportError:
     try:
         from langchain_core.memory import ConversationBufferMemory
     except ImportError:
-        # Simple fallback
+        # Try to import message types for proper fallback
+        try:
+            from langchain_core.messages import HumanMessage, AIMessage
+        except ImportError:
+            # If message types not available, create simple compatible classes
+            class HumanMessage:
+                def __init__(self, content):
+                    self.content = content
+                    self.type = "human"
+            
+            class AIMessage:
+                def __init__(self, content):
+                    self.content = content
+                    self.type = "ai"
+        
+        # Simple fallback with proper message types
+        class SimpleChatMemory:
+            def __init__(self):
+                self.messages = []
+            
+            def add_user_message(self, msg):
+                self.messages.append(HumanMessage(msg))
+            
+            def add_ai_message(self, msg):
+                self.messages.append(AIMessage(msg))
+        
         class ConversationBufferMemory:
             def __init__(self, memory_key="chat_history", return_messages=True):
                 self.memory_key = memory_key
                 self.return_messages = return_messages
-                self.chat_memory = type('obj', (object,), {
-                    'messages': [],
-                    'add_user_message': lambda self, msg: self.messages.append(type('obj', (object,), {'content': msg, 'type': 'human'})()),
-                    'add_ai_message': lambda self, msg: self.messages.append(type('obj', (object,), {'content': msg, 'type': 'ai'})())
-                })()
+                self.chat_memory = SimpleChatMemory()
 
 from utils.tools import (
     update_cv_section_tool,
@@ -78,7 +99,7 @@ def create_assistant_tools(api_key: str) -> List[Tool]:
                     "new_content": content
                 })
             ),
-            description="Update a specific section in the CV. Input: cv_text (string), section_name (string like 'Experience' or 'Skills'), new_content (string with the new section content). Returns updated CV text."
+            description="Update a specific section in the CV. Input: cv_text (string, the full CV text), section_name (string like 'Experience', 'Skills', 'Certifications', 'Education'), new_content (string with the COMPLETE new section content - this REPLACES the entire section content, so include all items you want to keep). To remove a specific item: first use search_cv to find the current section content, then provide new_content with that item removed. Returns updated CV text."
         ),
         Tool(
             name="search_cv",
@@ -193,7 +214,10 @@ Use this context to better understand the user's request and provide accurate re
         target_language = language_names.get(language, "French (Français)")
         
         # Try to use AgentExecutor if available, fallback to manual if not
-        if HAS_AGENT_EXECUTOR:
+        use_agent_executor = HAS_AGENT_EXECUTOR
+        agent_executor = None
+        
+        if use_agent_executor:
             try:
                 # Use LangChain's ReAct agent
                 prompt_template = hub.pull("hwchase17/react")
@@ -212,10 +236,11 @@ Use this context to better understand the user's request and provide accurate re
                 )
             except Exception as hub_error:
                 # If hub.pull fails, fall through to manual implementation
-                HAS_AGENT_EXECUTOR = False
+                use_agent_executor = False
+                agent_executor = None
                 print(f"Hub not available, using fallback: {hub_error}")
         
-        if HAS_AGENT_EXECUTOR:
+        if use_agent_executor and agent_executor:
             try:
                 # Prepare input with context
                 input_text = f"""You are a helpful assistant that helps users refine their optimized CV and correct skills detection.
@@ -234,12 +259,17 @@ CRITICAL RULES:
 - Answer in {target_language}
 - Use the available tools to make changes
 - When using update_cv_section, pass the full optimized_cv as cv_text parameter
+- IMPORTANT: To remove a specific item from a section:
+  1. First use search_cv to find the current section content
+  2. Read the section content carefully
+  3. Create new_content with the item removed but all other items kept
+  4. Use update_cv_section with the complete new section content
 - After using tools, explain what you changed in {target_language}
 - Keep the CV format and structure intact
 
 Available tools:
-- update_cv_section(cv_text, section_name, new_content): Update a specific section in the CV
-- search_cv(cv_text, search_term): Search for content in the CV
+- update_cv_section(cv_text, section_name, new_content): REPLACES the entire section content. You must provide ALL items you want to keep in new_content.
+- search_cv(cv_text, search_term): Search for specific content in the CV to find current section content
 - extract_cv_skills(text): Extract skills from CV text
 - extract_job_skills(text): Extract skills from job description
 - compare_skills(cv_skills_json, job_skills_json): Compare CV skills with job skills
@@ -247,26 +277,54 @@ Available tools:
 Analyze the user's request and use the appropriate tools to make the changes."""
             
                 # Run the agent
+                # AgentExecutor handles memory automatically via the memory parameter
                 result = agent_executor.invoke({
-                    "input": input_text,
-                    "chat_history": memory.chat_memory.messages if hasattr(memory, 'chat_memory') else []
+                    "input": input_text
                 })
                 
                 explanation = result.get("output", "")
                 
-                # Try to extract updated CV from tool results or explanation
+                # Try to extract updated CV from tool results
                 updated_cv = optimized_cv
+                tool_error = None
                 if "intermediate_steps" in result:
                     for step in result["intermediate_steps"]:
-                        if len(step) > 1 and hasattr(step[1], 'get'):
+                        if len(step) > 1:
                             tool_result = step[1]
-                            if isinstance(tool_result, dict) and "updated_cv" in tool_result:
+                            # Handle both dict and string results
+                            if isinstance(tool_result, str):
                                 try:
-                                    result_data = json.loads(tool_result.get("updated_cv", ""))
-                                    if isinstance(result_data, dict) and "updated_cv" in result_data:
-                                        updated_cv = result_data["updated_cv"]
+                                    tool_result = json.loads(tool_result)
                                 except:
                                     pass
+                            
+                            if isinstance(tool_result, dict):
+                                # Check for error status
+                                if tool_result.get("status") == "error":
+                                    tool_error = tool_result.get("error", "Unknown tool error")
+                                
+                                # Try to get updated_cv from tool result
+                                if "updated_cv" in tool_result:
+                                    try:
+                                        cv_data = tool_result["updated_cv"]
+                                        # If it's a string, try to parse it
+                                        if isinstance(cv_data, str):
+                                            try:
+                                                parsed = json.loads(cv_data)
+                                                if isinstance(parsed, dict) and "updated_cv" in parsed:
+                                                    updated_cv = parsed["updated_cv"]
+                                                else:
+                                                    updated_cv = cv_data
+                                            except:
+                                                updated_cv = cv_data
+                                        else:
+                                            updated_cv = cv_data
+                                    except Exception as e:
+                                        print(f"Error extracting updated_cv: {e}")
+                
+                # If tool returned an error, include it in the explanation
+                if tool_error:
+                    explanation = f"{explanation}\n\n⚠️ Tool error: {tool_error}"
                 
                 # Add to memory
                 if hasattr(memory, 'chat_memory'):
@@ -283,9 +341,10 @@ Analyze the user's request and use the appropriate tools to make the changes."""
             except Exception as agent_error:
                 # Fallback to simpler implementation if AgentExecutor fails
                 print(f"AgentExecutor execution failed, using fallback: {agent_error}")
+                use_agent_executor = False
         
         # Fallback to simpler implementation if AgentExecutor not available
-        if not HAS_AGENT_EXECUTOR:
+        if not use_agent_executor:
             
             # Use simple LLM with tools in prompt (original implementation)
             system_message = f"""You are a helpful assistant that helps users refine their optimized CV and correct skills detection.
@@ -298,21 +357,26 @@ Your task is to:
 CRITICAL RULES:
 - Answer in {target_language}
 - Use tools to perform actions (update_cv_section, search_cv, extract_skills, compare_skills)
+- IMPORTANT: To remove a specific item from a section:
+  1. First use search_cv to find the current section content
+  2. Read the section content carefully
+  3. Create new_content with the item removed but all other items kept
+  4. Use update_cv_section with the complete new section content
 - After using tools, explain what you did in {target_language}
 - Keep the CV format and structure intact
 - Only make the specific changes requested
 
 Available tools:
-- update_cv_section: Update a specific section in the CV
-- search_cv: Search for content in the CV
+- update_cv_section: REPLACES the entire section content. You must provide ALL items you want to keep.
+- search_cv: Search for specific content in the CV to find current section content
 - extract_cv_skills: Extract skills from CV text
 - extract_job_skills: Extract skills from job description
 - compare_skills: Compare CV skills with job skills
 
 When the user requests changes:
 1. First, understand what they want (CV modification, skill update, or both)
-2. Use search_cv if you need to find specific content
-3. Use update_cv_section to modify CV sections
+2. Use search_cv if you need to find specific content or read current section content
+3. Use update_cv_section to modify CV sections - remember to include ALL items you want to keep
 4. Use extract_skills and compare_skills if working with skills
 5. Explain your actions clearly in {target_language}
 

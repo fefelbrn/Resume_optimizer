@@ -1869,6 +1869,73 @@ input[type="range"]::-moz-range-thumb {
     word-wrap: break-word;
 }
 
+/* Graph Visualization Styles */
+.mermaid-container {
+    width: 100%;
+    min-height: 400px;
+    padding: 1.5rem;
+    background: var(--bg-color);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.mermaid-container .mermaid {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.mermaid-container svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.graph-error {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    border: 1px dashed var(--border-color);
+}
+
+/* Graph node info tooltip style */
+.graph-node-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--primary-color);
+}
+
+.graph-node-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.graph-node-info p {
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.graph-node-info .tools-list {
+    margin-top: 0.5rem;
+    padding-left: 1.25rem;
+}
+
+.graph-node-info .tools-list li {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+    margin: 0.2rem 0;
+}
+
 @media (max-width: 768px) {
     .logs-modal-content {
         max-width: 95vw;
@@ -1878,6 +1945,11 @@ input[type="range"]::-moz-range-thumb {
     .logs-tab-btn {
         padding: 0.5rem 1rem;
         font-size: 0.85rem;
+    }
+    
+    .mermaid-container {
+        min-height: 300px;
+        padding: 1rem;
     }
 }
 

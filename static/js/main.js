@@ -714,6 +714,7 @@ async function optimizeCv() {
         state.lastExecutionLogs = {
             agent_logs: data.agent_logs || [],
             rag_details: data.rag_details || null,
+            graph_structure: data.graph_structure || null,  // NEW: Store graph structure
             model_used: data.model_used || elements.modelSelect?.value || 'N/A',
             temperature: parseFloat(elements.temperatureInput?.value) || 0.3,
             word_count: data.word_count || 0,
@@ -1872,6 +1873,9 @@ function showLogsModal() {
         elements.simplifiedLogContent.innerHTML = simplifiedLog;
     }
     
+    // Generate graph visualization
+    generateGraphVisualization(state.lastExecutionLogs);
+    
     // Generate full log
     const fullLog = generateFullLog(state.lastExecutionLogs);
     if (elements.fullLogContent) {
@@ -1906,6 +1910,11 @@ function switchLogsTab(tabName) {
             content.classList.remove('active');
         }
     });
+    
+    // If switching to graph tab, regenerate graph (in case it wasn't rendered yet)
+    if (tabName === 'graph' && state.lastExecutionLogs) {
+        generateGraphVisualization(state.lastExecutionLogs);
+    }
 }
 
 // Generate simplified log
@@ -2027,4 +2036,131 @@ function generateFullLog(logs) {
     html += '</pre>';
     html += '</div>';
     return html;
+}
+
+// Generate graph visualization using Mermaid
+function generateGraphVisualization(logs) {
+    const graphContainer = document.getElementById('mermaid-graph');
+    if (!graphContainer) {
+        console.error('Graph container not found');
+        return;
+    }
+    
+    if (!logs.graph_structure) {
+        graphContainer.innerHTML = '<div class="graph-error">No graph structure available. Please optimize a CV first.</div>';
+        return;
+    }
+    
+    const graph = logs.graph_structure;
+    const agentLogs = logs.agent_logs || [];
+    
+    // Map node IDs to execution status based on logs
+    const nodeStatus = {};
+    graph.nodes.forEach(node => {
+        // Check if there's a log entry for this node
+        const nodeLog = agentLogs.find(log => {
+            const logLower = log.toLowerCase();
+            const nodeNameLower = node.name.toLowerCase();
+            return logLower.includes(nodeNameLower) || 
+                   logLower.includes(node.id) ||
+                   (node.id === 'analyze_structure' && logLower.includes('analyzed cv structure')) ||
+                   (node.id === 'extract_cv_skills' && logLower.includes('extracted') && logLower.includes('skills from cv')) ||
+                   (node.id === 'extract_job_skills' && logLower.includes('extracted') && logLower.includes('skills from job')) ||
+                   (node.id === 'compare_skills' && logLower.includes('compared skills')) ||
+                   (node.id === 'generate_cv' && logLower.includes('generated optimized cv'));
+        });
+        
+        if (nodeLog) {
+            nodeStatus[node.id] = nodeLog.includes('✓') ? 'success' : nodeLog.includes('✗') ? 'error' : 'pending';
+        } else {
+            nodeStatus[node.id] = 'pending';
+        }
+    });
+    
+    // Generate Mermaid diagram
+    let mermaidCode = 'graph LR\n';
+    mermaidCode += '    direction LR\n';
+    mermaidCode += '    style Start fill:#e1f5ff,stroke:#01579b,stroke-width:2px\n';
+    mermaidCode += '    style End fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px\n\n';
+    
+    // Add nodes with styling based on status
+    graph.nodes.forEach((node, index) => {
+        const nodeId = node.id.replace(/_/g, '');
+        const status = nodeStatus[node.id] || 'pending';
+        let nodeLabel = node.name;
+        
+        // Add tools info if available
+        if (node.tools && node.tools.length > 0) {
+            nodeLabel += `\\n[${node.tools.length} tool${node.tools.length > 1 ? 's' : ''}]`;
+        }
+        
+        // Style based on status
+        let fillColor, strokeColor;
+        switch(status) {
+            case 'success':
+                fillColor = '#e8f5e9';
+                strokeColor = '#2e7d32';
+                break;
+            case 'error':
+                fillColor = '#ffebee';
+                strokeColor = '#c62828';
+                break;
+            default:
+                fillColor = '#f5f5f5';
+                strokeColor = '#757575';
+        }
+        
+        mermaidCode += `    ${nodeId}["${nodeLabel}"]\n`;
+        mermaidCode += `    style ${nodeId} fill:${fillColor},stroke:${strokeColor},stroke-width:2px\n`;
+    });
+    
+    // Add Start and End nodes
+    mermaidCode += '    Start([Start])\n';
+    mermaidCode += '    End([End])\n';
+    
+    // Add edges
+    mermaidCode += `\n    Start --> ${graph.nodes[0].id.replace(/_/g, '')}\n`;
+    graph.edges.forEach(edge => {
+        const fromId = edge.from.replace(/_/g, '');
+        const toId = edge.to.replace(/_/g, '');
+        mermaidCode += `    ${fromId} --> ${toId}\n`;
+    });
+    mermaidCode += `    ${graph.nodes[graph.nodes.length - 1].id.replace(/_/g, '')} --> End\n`;
+    
+    // Clear container and render
+    graphContainer.innerHTML = '';
+    
+    // Initialize Mermaid if not already done
+    if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({ 
+            startOnLoad: false,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+        
+        // Generate unique ID for this graph
+        const graphId = 'mermaid-graph-' + Date.now();
+        const graphElement = document.createElement('div');
+        graphElement.className = 'mermaid';
+        graphElement.id = graphId;
+        graphElement.textContent = mermaidCode;
+        graphContainer.appendChild(graphElement);
+        
+        // Render the graph using the async API
+        mermaid.run({
+            nodes: [graphElement],
+            suppressErrors: false
+        }).then(() => {
+            console.log('Graph rendered successfully');
+        }).catch(err => {
+            console.error('Error rendering Mermaid graph:', err);
+            graphContainer.innerHTML = '<div class="graph-error">Error rendering graph: ' + escapeHtml(err.message) + '</div>';
+        });
+    } else {
+        graphContainer.innerHTML = '<div class="graph-error">Mermaid.js library not loaded. Please refresh the page.</div>';
+    }
 }
