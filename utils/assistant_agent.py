@@ -144,7 +144,7 @@ def process_assistant_request_with_agent(
     temperature: float = 0.7,
     language: str = "fr",
     memory: Optional[ConversationBufferMemory] = None,
-    rag_system: Optional[Any] = None  # NEW: RAG system parameter
+    rag_system: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
     Process assistant request using a ReAct agent with tools and memory.
@@ -324,7 +324,7 @@ Analyze the user's request and use the appropriate tools to make the changes."""
                 
                 # If tool returned an error, include it in the explanation
                 if tool_error:
-                    explanation = f"{explanation}\n\n⚠️ Tool error: {tool_error}"
+                    explanation = f"{explanation}\n\nTool error: {tool_error}"
                 
                 # Add to memory
                 if hasattr(memory, 'chat_memory'):
@@ -335,7 +335,7 @@ Analyze the user's request and use the appropriate tools to make the changes."""
                     "action": "update_cv",
                     "updated_cv": updated_cv,
                     "explanation": explanation,
-                    "sources": sources,  # NEW: Return RAG sources
+                    "sources": sources,
                     "agent_logs": [explanation]
                 }
             except Exception as agent_error:
@@ -428,7 +428,7 @@ Analyze the request. If you need to use tools, describe which tool and how. Then
                 "action": "update_cv",
                 "updated_cv": updated_cv,
                 "explanation": explanation,
-                "sources": sources,  # NEW: Return RAG sources
+                "sources": sources,
                 "agent_logs": [explanation]
             }
         

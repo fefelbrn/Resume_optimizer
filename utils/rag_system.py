@@ -257,20 +257,10 @@ class RAGSystem:
             
             # Chroma returns distances, not similarities
             # For cosine similarity: distance = 1 - similarity, so similarity = 1 - distance
-            # Chroma uses cosine distance where:
-            # - 0 = identical vectors (cosine similarity = 1)
-            # - 2 = opposite vectors (cosine similarity = -1)
-            # So: similarity = 1 - (distance / 2) for cosine distance
-            # But if score is already a similarity (0-1), we keep it as is
+            # But, also happen: similarity = 1 - (distance / 2) for cosine distance
             
             normalized_results = []
             for doc, score in results:
-                # Chroma's similarity_search_with_score returns distances (lower = more similar)
-                # For cosine similarity embeddings, Chroma typically uses cosine distance
-                # Cosine distance formula: distance = 1 - cosine_similarity
-                # So: cosine_similarity = 1 - distance
-
-                # However, Chroma may return distances in different ranges:
                 # -> If normalized: distance in [0, 1] where 0 = identical, 1 = orthogonal
                 # -> If not normalized: distance in [0, 2] where 0 = identical, 2 = opposite
 
@@ -283,10 +273,8 @@ class RAGSystem:
                     similarity = 1.0 - score
                 elif score <= 2.0:
                     # Score in (1, 2] - treat as non-normalized cosine distance
-                    # Cosine distance range: [0, 2] where 2 = opposite
                     similarity = 1.0 - (score / 2.0)
                 else:
-                    # Score > 2 - unusual, might be L2 distance or other metric
                     # Normalize using inverse relationship
                     similarity = max(0.0, 1.0 / (1.0 + score))
                 
@@ -358,9 +346,9 @@ class RAGSystem:
             "jd_sources": jd_sources,
             "cv_chunks": cv_chunks,
             "jd_chunks": jd_chunks,
-            "cv_chunks_details": cv_chunks_details,  # NEW: Detailed info with scores
-            "jd_chunks_details": jd_chunks_details,    # NEW: Detailed info with scores
-            "query": query  # NEW: Store the query used
+            "cv_chunks_details": cv_chunks_details,
+            "jd_chunks_details": jd_chunks_details,
+            "query": query
         }
     
     def clear_cv(self) -> None:
@@ -375,4 +363,3 @@ class RAGSystem:
         """Clear all vector stores."""
         self.clear_cv()
         self.clear_jd()
-

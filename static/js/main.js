@@ -2006,10 +2006,18 @@ function generateSimplifiedLog(logs) {
         }
         if (logs.skills_comparison) {
             const comp = logs.skills_comparison;
-            html += `<p>• Matched: ${comp.matched?.length || 0} skills</p>`;
-            html += `<p>• Missing: ${comp.job_only?.length || 0} skills</p>`;
-            if (comp.stats && comp.stats.avg_similarity) {
-                html += `<p>• Average similarity: <strong>${(comp.stats.avg_similarity * 100).toFixed(1)}%</strong></p>`;
+            const matchedCount = comp.matched?.length || 0;
+            const missingCount = comp.job_only?.length || 0;
+            const jobSkillsCount = logs.job_skills?.length || 0;
+            
+            // Calculate match rate (percentage of job skills found in CV)
+            const matchRate = jobSkillsCount > 0 ? ((matchedCount / jobSkillsCount) * 100).toFixed(1) : '0.0';
+            
+            html += `<p>• Matched: <strong>${matchedCount}</strong> out of <strong>${jobSkillsCount}</strong> job skills</p>`;
+            html += `<p>• Match rate: <strong>${matchRate}%</strong> (${matchedCount}/${jobSkillsCount} job skills found in CV)</p>`;
+            html += `<p>• Missing: <strong>${missingCount}</strong> job skills not found in CV</p>`;
+            if (comp.stats && comp.stats.avg_similarity && matchedCount > 0) {
+                html += `<p>• Average similarity of matched skills: <strong>${(comp.stats.avg_similarity * 100).toFixed(1)}%</strong> (how similar the matched skills are)</p>`;
             }
         }
         html += '</div>';
