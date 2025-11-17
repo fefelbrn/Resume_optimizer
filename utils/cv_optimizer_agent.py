@@ -34,12 +34,12 @@ class CVOptimizationState(TypedDict):
     skills_comparison: Optional[Dict[str, Any]]
     
     # RAG components
-    rag_system: Optional[Any]  # RAGSystem instance
+    rag_system: Optional[Any]
     
     # Final result
     optimized_cv: Optional[str]
-    sources: Optional[Dict[str, List[str]]]  # Sources used for generation
-    rag_details: Optional[Dict[str, Any]]  # NEW: Detailed RAG information for logging
+    sources: Optional[Dict[str, List[str]]]
+    rag_details: Optional[Dict[str, Any]]
     error: Optional[str]
     agent_logs: List[str]
 
@@ -108,7 +108,6 @@ def index_cv_in_rag(state: CVOptimizationState) -> CVOptimizationState:
         return state
     except Exception as e:
         state["agent_logs"].append(f"✗ Error indexing CV in RAG: {str(e)}")
-        # Don't fail the workflow, just log the error
         return state
 
 
@@ -127,7 +126,6 @@ def index_jd_in_rag(state: CVOptimizationState) -> CVOptimizationState:
         return state
     except Exception as e:
         state["agent_logs"].append(f"✗ Error indexing JD in RAG: {str(e)}")
-        # Don't fail the workflow, just log the error
         return state
 
 
@@ -243,7 +241,7 @@ IMPORTANT: Use information from the chunks above. These are the most relevant pa
 """
                     state["agent_logs"].append(f"✓ Retrieved {len(cv_sources)} CV chunks and {len(jd_sources)} JD chunks using RAG")
                     
-                    # Store detailed RAG info for logging
+                    # Store detailed RAG info for log
                     if not state.get("rag_details"):
                         state["rag_details"] = {}
                     state["rag_details"]["retrieval"] = {
@@ -319,23 +317,23 @@ def create_cv_optimization_agent() -> StateGraph:
     """Create the LangGraph workflow for CV optimization with RAG"""
     workflow = StateGraph(CVOptimizationState)
     
-    # Add nodes
+    # Nodes for the workflow
     workflow.add_node("analyze_structure", analyze_structure)
     workflow.add_node("extract_cv_skills", extract_cv_skills)
-    workflow.add_node("index_cv_rag", index_cv_in_rag)  # NEW: Index CV in RAG
+    workflow.add_node("index_cv_rag", index_cv_in_rag)
     workflow.add_node("extract_job_skills", extract_job_skills)
-    workflow.add_node("index_jd_rag", index_jd_in_rag)  # NEW: Index JD in RAG
+    workflow.add_node("index_jd_rag", index_jd_in_rag)
     workflow.add_node("compare_skills", compare_skills)
     workflow.add_node("generate_cv", generate_optimized_cv)
     
-    # Set entry point
+    # Entry point for the workflow
     workflow.set_entry_point("analyze_structure")
     
-    # Add edges (sequential workflow with RAG nodes)
+    # Add edges for the workflow
     workflow.add_edge("analyze_structure", "extract_cv_skills")
-    workflow.add_edge("extract_cv_skills", "index_cv_rag")  # NEW: After CV skills extraction
+    workflow.add_edge("extract_cv_skills", "index_cv_rag")
     workflow.add_edge("index_cv_rag", "extract_job_skills")
-    workflow.add_edge("extract_job_skills", "index_jd_rag")  # NEW: After JD skills extraction
+    workflow.add_edge("extract_job_skills", "index_jd_rag")
     workflow.add_edge("index_jd_rag", "compare_skills")
     workflow.add_edge("compare_skills", "generate_cv")
     workflow.add_edge("generate_cv", END)
@@ -353,7 +351,7 @@ def optimize_cv_with_agent(
     max_experiences: int = 8,
     max_date_years: Optional[int] = None,
     language: str = "fr",
-    rag_system: Optional[Any] = None,  # NEW: RAG system parameter
+    rag_system: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Optimize CV using the agent-based workflow.
@@ -375,10 +373,10 @@ def optimize_cv_with_agent(
         "cv_skills": [],
         "job_skills": [],
         "skills_comparison": None,
-        "rag_system": rag_system,  # NEW: Include RAG system in state
+        "rag_system": rag_system,
         "optimized_cv": None,
-        "sources": None,  # NEW: Sources will be populated by generate_optimized_cv
-        "rag_details": None,  # NEW: Detailed RAG information
+        "sources": None,
+        "rag_details": None,
         "error": None,
         "agent_logs": []
     }
@@ -449,7 +447,13 @@ def optimize_cv_with_agent(
                 {"from": "index_jd_rag", "to": "compare_skills"},
                 {"from": "compare_skills", "to": "generate_cv"}
             ],
-            "execution_order": ["analyze_structure", "extract_cv_skills", "index_cv_rag", "extract_job_skills", "index_jd_rag", "compare_skills", "generate_cv"]
+            "execution_order": ["analyze_structure", 
+                                "extract_cv_skills", 
+                                "index_cv_rag", 
+                                "extract_job_skills", 
+                                "index_jd_rag", 
+                                "compare_skills", 
+                                "generate_cv"]
         }
         
         return {
@@ -458,9 +462,9 @@ def optimize_cv_with_agent(
             "cv_skills": final_state.get("cv_skills", []),
             "job_skills": final_state.get("job_skills", []),
             "skills_comparison": final_state.get("skills_comparison"),
-            "sources": final_state.get("sources"),  # NEW: Return sources
-            "rag_details": final_state.get("rag_details"),  # NEW: Return detailed RAG info
-            "graph_structure": graph_structure,  # NEW: Return graph structure
+            "sources": final_state.get("sources"),
+            "rag_details": final_state.get("rag_details"),
+            "graph_structure": graph_structure,
             "model_used": model,
             "temperature": temperature,
             "word_count": len(final_state.get("optimized_cv", "").split()) if final_state.get("optimized_cv") else 0
@@ -471,4 +475,3 @@ def optimize_cv_with_agent(
             "optimized_cv": None,
             "agent_logs": ["✗ Agent execution failed"]
         }
-
