@@ -34,12 +34,14 @@ We decided to rebuild the application using agents because:
 
 **How it works**: 
 - Built with **LangGraph** using a `StateGraph` workflow
-- Implements a 5-node sequential pipeline:
+- Implements a 7-node sequential pipeline with RAG (Retrieval-Augmented Generation):
   1. **Analyze Structure**: Uses `analyze_cv_structure_tool` to identify CV sections
   2. **Extract CV Skills**: Uses `extract_skills_tool` to identify candidate skills
-  3. **Extract Job Skills**: Uses `extract_skills_tool` to identify required job skills
-  4. **Compare Skills**: Uses `compare_skills_tool` to find matches, gaps, and interesting skills
-  5. **Generate Optimized CV**: Uses LLM with context from previous steps to create tailored CV
+  3. **Index CV in RAG**: Vectorizes CV chunks for semantic search
+  4. **Extract Job Skills**: Uses `extract_skills_tool` to identify required job skills
+  5. **Index JD in RAG**: Vectorizes job description chunks for semantic search
+  6. **Compare Skills**: Uses `compare_skills_tool_with_rag` to find matches, gaps, and interesting skills using cosine similarity
+  7. **Generate Optimized CV**: Uses LLM with RAG context from previous steps to create tailored CV
 
 **Why this approach**: The workflow ensures each step builds on the previous one, providing rich context for the final optimization. The state management allows us to track progress and handle errors gracefully.
 
@@ -75,7 +77,20 @@ We decided to rebuild the application using agents because:
 
 **Why this approach**: Tools provide a clean abstraction layer. Agents don't need to know implementation details, just what each tool does. This makes the system more modular and testable.
 
-#### 4. Skills Matcher (`utils/skills_matcher.py`)
+#### 4. RAG System (`utils/rag_system.py`)
+
+**What it does**: Handles vectorization, storage, and semantic search of CVs and Job Descriptions using embeddings.
+
+**How it works**:
+- Uses OpenAI embeddings to convert text chunks into vectors
+- Stores vectors in Chroma vector database
+- Performs semantic search to retrieve most relevant chunks
+- Calculates cosine similarity scores (normalized to 0-1 range) for ranking
+- Provides context-aware retrieval for CV optimization
+
+**Why this approach**: RAG enables the system to focus on the most relevant parts of the CV and job description, improving the quality of optimization by using semantic understanding rather than simple keyword matching.
+
+#### 5. Skills Matcher (`utils/skills_matcher.py`)
 
 **What it does**: Wrapper module that provides a clean API for skill extraction and matching.
 
@@ -87,11 +102,20 @@ We decided to rebuild the application using agents because:
 
 1. **User uploads CV and job description** → Files are parsed and text is extracted
 2. **Skills are automatically extracted** → Both CV and job description skills are identified
-3. **Skills are matched** → System identifies matches, gaps, and interesting skills
-4. **User requests CV optimization** → CV Optimization Agent runs the 5-step workflow
+3. **Skills are matched** → System identifies matches, gaps, and interesting skills using RAG and cosine similarity
+4. **User requests CV optimization** → CV Optimization Agent runs the 7-step workflow with RAG:
+   - CV and JD are vectorized and indexed
+   - Semantic search retrieves most relevant chunks
+   - Skills are compared using embeddings
+   - CV is optimized with RAG context
 5. **Optimized CV is generated** → User can review and download
-6. **User can request adjustments** → Assistant Agent uses tools to make changes
-7. **Conversation history is maintained** → Assistant remembers context across requests
+6. **Execution logs are available** → User can view detailed logs including:
+   - Graph visualization of the LangGraph workflow
+   - RAG vectorization details (chunks, similarity scores)
+   - Skills matching statistics (match rate vs similarity score)
+   - Agent execution steps
+7. **User can request adjustments** → Assistant Agent uses tools to make changes
+8. **Conversation history is maintained** → Assistant remembers context across requests
 
 ## Technology Stack
 
@@ -120,6 +144,7 @@ We decided to rebuild the application using agents because:
     ├── cv_optimizer_agent.py  # LangGraph workflow for CV optimization
     ├── assistant_agent.py     # ReAct agent for conversational assistant
     ├── tools.py               # LangChain tools (@tool decorator)
+    ├── rag_system.py         # RAG system for vectorization and semantic search
     ├── skills_matcher.py     # Skills extraction and matching API
     ├── pdf_parser.py         # PDF text extraction
     ├── pdf_generator.py      # PDF generation (Harvard template)
@@ -141,6 +166,7 @@ We used LangGraph instead of a simple chain because:
 - State management is crucial for tracking intermediate results
 - Error handling is easier with explicit workflow nodes
 - The workflow is visualizable and debuggable
+- Graph structure can be exported and visualized in the logs for transparency
 
 ### 3. AgentExecutor for Assistant
 We used AgentExecutor with ReAct because:
@@ -156,7 +182,15 @@ We implemented everything as tools because:
 - They're easy to test independently
 - They make the system more modular
 
-### 5. No Fallbacks
+### 5. RAG for Context-Aware Optimization
+We integrated RAG (Retrieval-Augmented Generation) because:
+- Semantic search finds the most relevant parts of CV and job description
+- Cosine similarity provides accurate relevance scoring
+- Vectorization enables efficient similarity calculations
+- Context-aware generation produces more targeted optimizations
+- Similarity scores are normalized (0-1) for consistent interpretation
+
+### 6. No Fallbacks
 We removed all fallback implementations because:
 - Agents should handle errors gracefully themselves
 - Fallbacks create code duplication
@@ -218,32 +252,49 @@ When a user requests CV optimization, here's exactly what happens:
    - Results stored in `state["cv_skills"]`
    - Agent logs: "✓ Extracted X skills from CV"
 
-4. **Node 3 - Extract Job Skills**:
+4. **Node 3 - Index CV in RAG**:
+   - CV text is split into chunks (default: 500 characters with 50 overlap)
+   - Chunks are vectorized using OpenAI embeddings
+   - Vectors are stored in Chroma vector database
+   - Results stored in `state["rag_system"]`
+   - Agent logs: "✓ Indexed CV in vector database: X chunks"
+
+5. **Node 4 - Extract Job Skills**:
    - Same `extract_skills_tool` is called with `text_type="job"`
    - The job description is analyzed for required/preferred skills
    - Results stored in `state["job_skills"]`
    - Agent logs: "✓ Extracted X skills from job description"
 
-5. **Node 4 - Compare Skills**:
-   - The `compare_skills_tool` performs intelligent matching
-   - It identifies: matched skills (green), missing skills (red), CV-only skills (gray), interesting skills (blue)
-   - Uses fuzzy matching and AI analysis for skill relevance
-   - Results stored in `state["skills_comparison"]`
-   - Agent logs: "✓ Compared skills: X matches, Y missing"
+6. **Node 5 - Index JD in RAG**:
+   - Job description is split into chunks
+   - Chunks are vectorized and stored in vector database
+   - Results stored in `state["rag_system"]`
+   - Agent logs: "✓ Indexed job description in vector database: X chunks"
 
-6. **Node 5 - Generate Optimized CV**:
+7. **Node 6 - Compare Skills**:
+   - The `compare_skills_tool_with_rag` performs intelligent matching using embeddings
+   - Uses cosine similarity to match CV and job skills
+   - It identifies: matched skills (green), missing skills (red), CV-only skills (gray), interesting skills (blue)
+   - Provides match rate (percentage of job skills found) and average similarity score
+   - Results stored in `state["skills_comparison"]`
+   - Agent logs: "✓ Compared skills using RAG + cosine similarity: X matches, Y missing"
+
+8. **Node 7 - Generate Optimized CV**:
+   - RAG system retrieves most relevant CV and JD chunks using semantic search
+   - Cosine similarity scores are calculated for each chunk (normalized to 0-1 range)
    - All previous results are compiled into context
    - An LLM prompt is constructed with:
      - Original CV
      - Job description
+     - RAG-retrieved relevant chunks (top 5 CV chunks, top 3 JD chunks)
      - CV structure information
-     - Skills analysis (matches, gaps, interesting skills)
+     - Skills analysis (matches, gaps, interesting skills with match rate and similarity scores)
      - Optimization parameters (min/max experiences, date filters)
-   - The LLM generates a tailored CV
-   - Results stored in `state["optimized_cv"]`
-   - Agent logs: "✓ Generated optimized CV (X words)"
+   - The LLM generates a tailored CV using the most relevant context
+   - Results stored in `state["optimized_cv"]` and `state["sources"]`
+   - Agent logs: "✓ Generated optimized CV (X words) with RAG context"
 
-7. **Return Results**: The final state is returned with the optimized CV, all intermediate results, and agent logs.
+9. **Return Results**: The final state is returned with the optimized CV, all intermediate results, RAG sources, graph structure, and agent logs.
 
 ### Assistant Agent Workflow
 
@@ -326,6 +377,36 @@ Agents handle errors at multiple levels:
 
 This multi-layer approach ensures the system is robust and provides helpful error messages.
 
+## Execution Logs and Visualization
+
+The application provides comprehensive execution logs accessible via the "View Logs" button after CV optimization:
+
+### Log Features
+
+1. **Simplified Log**: Human-readable summary of the optimization process
+   - Execution summary (model, temperature, word count)
+   - RAG vectorization details (chunk counts, sizes, similarity scores)
+   - Skills extraction and matching statistics
+   - Clear distinction between:
+     - **Match rate**: Percentage of job skills found in CV (e.g., 50% = 8/16 skills)
+     - **Average similarity**: How similar the matched skills are (e.g., 92% similarity)
+   - Agent execution steps
+
+2. **Graph Visualization**: Interactive LangGraph workflow diagram
+   - Visual representation of all 7 nodes in the optimization pipeline
+   - Color-coded nodes (green = success, red = error, gray = pending)
+   - Shows execution flow with arrows
+   - Displays tools used by each node
+   - Generated using Mermaid.js
+
+3. **Full Log**: Complete JSON dump of all execution data for debugging
+
+### RAG Metrics in Logs
+
+- **CV/JD Vectorization**: Number of chunks, total characters, average chunk size, size range
+- **Semantic Search**: Query used, number of chunks retrieved, cosine similarity scores (0-100%)
+- **Skills Matching**: Match rate (X/Y job skills found) and average similarity of matched skills
+
 ## Performance Considerations
 
 - **Caching**: Skills extraction results are cached to avoid redundant API calls
@@ -333,6 +414,8 @@ This multi-layer approach ensures the system is robust and provides helpful erro
 - **Concurrent Control**: Flags prevent multiple simultaneous extractions
 - **Rate Limiting**: The system handles OpenAI rate limits gracefully with user-friendly messages
 - **State Persistence**: LangGraph state is maintained throughout the workflow, avoiding redundant processing
+- **RAG Optimization**: Vector stores are session-based and can be cleared to free memory
+- **Cosine Similarity**: Scores are normalized to 0-1 range for consistent interpretation
 
 ## Security Considerations
 
