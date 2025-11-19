@@ -385,12 +385,14 @@ def api_assistant():
         
         if result.get('error'):
             return jsonify({
+                'success': False,
                 'error': result['error'],
                 'updated_cv': optimized_cv,
                 'explanation': None
             }), 500
         
         return jsonify({
+            'success': True,
             'action': result.get('action'),
             'updated_cv': result.get('updated_cv', optimized_cv),
             'explanation': result.get('explanation'),
@@ -401,6 +403,7 @@ def api_assistant():
     except Exception as e:
         error_info = parse_openai_error(e)
         return jsonify({
+            'success': False,
             'error': error_info['user_message'],
             'error_code': error_info.get('error_code'),
             'updated_cv': data.get('optimized_cv', ''),

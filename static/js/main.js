@@ -673,8 +673,12 @@ async function optimizeCv() {
 
     showLoading('Optimizing CV...');
 
+    // Use optimized CV if it exists and has been modified by assistant
+    // Otherwise use original CV
+    const cvToOptimize = (state.optimizedCv && state.optimizedCv.trim()) ? state.optimizedCv : state.cvText;
+
     const payload = {
-        cv_text: state.cvText,
+        cv_text: cvToOptimize,
         job_description: state.jobDescription,
         api_key: elements.apiKeyInput.value,
         language: elements.languageSelect.value,
@@ -706,6 +710,9 @@ async function optimizeCv() {
         elements.optimizedCvContent.textContent = data.optimized_cv;
         elements.resultsSection.classList.remove('hidden');
         switchTab('optimized-cv');
+        
+        // Note: We keep state.cvText as the original CV for reference
+        // But future optimizations will use state.optimizedCv if it exists
         
         // Display RAG sources if available
         displayRAGSources(data.sources);
@@ -939,7 +946,7 @@ async function downloadContent(type) {
         
         // Generate PDF instead of TXT
         try {
-            const response = await fetch('/api/generate-pdf', {
+            const response = await fetch('/api/download-pdf', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -950,8 +957,16 @@ async function downloadContent(type) {
             });
             
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Error generating PDF');
+                // Try to parse error as JSON, but handle HTML error pages
+                let errorMessage = 'Error generating PDF';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error || errorMessage;
+                } catch (e) {
+                    // If response is not JSON (e.g., HTML error page), use status text
+                    errorMessage = `Error ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
             }
             
             // Download PDF
@@ -1321,8 +1336,17 @@ async function sendAssistantRequest() {
         if (data.success) {
             let responseText = data.explanation || 'Modification completed';
             
-            // Update CV if needed
+            // Update CV if needed - also check if updated_cv is different from current
             if (data.action === 'update_cv' || data.action === 'update_both') {
+                if (data.updated_cv && data.updated_cv !== state.optimizedCv) {
+                    state.optimizedCv = data.updated_cv;
+                    elements.optimizedCvContent.textContent = data.updated_cv;
+                    responseText += '\n\n✅ Optimized CV updated';
+                } else {
+                    console.warn('CV update requested but updated_cv is same as current or missing');
+                }
+            } else if (data.updated_cv && data.updated_cv !== state.optimizedCv) {
+                // Even if action is not set, update if CV changed
                 state.optimizedCv = data.updated_cv;
                 elements.optimizedCvContent.textContent = data.updated_cv;
                 responseText += '\n\n✅ Optimized CV updated';
