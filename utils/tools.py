@@ -9,6 +9,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from utils.langfuse_config import create_langfuse_callback
 
 
 @tool
@@ -27,10 +28,24 @@ def extract_skills_tool(text: str, text_type: str, api_key: str, model: str = "g
         Dictionary with 'skills' (list of strings) and 'count' (number of skills)
     """
     try:
+        # Créer callback Langfuse pour l'extraction de compétences
+        langfuse_callback = create_langfuse_callback(
+            trace_name="skill_extraction",
+            metadata={
+                "model": model,
+                "temperature": temperature,
+                "text_type": text_type,
+                "text_length": len(text)
+            }
+        )
+        
+        callbacks = [langfuse_callback] if langfuse_callback else None
+        
         llm = ChatOpenAI(
             model=model,
             temperature=temperature,
-            api_key=api_key
+            api_key=api_key,
+            callbacks=callbacks
         )
         
         if text_type == "cv":
@@ -174,10 +189,24 @@ def compare_skills_tool(cv_skills: List[str], job_skills: List[str], api_key: st
         interesting = []
         if cv_only and api_key and cv_text and job_text:
             try:
+                # Créer callback Langfuse pour la comparaison de compétences
+                langfuse_callback = create_langfuse_callback(
+                    trace_name="skill_comparison",
+                    metadata={
+                        "model": model,
+                        "temperature": temperature,
+                        "cv_skills_count": len(cv_skills),
+                        "job_skills_count": len(job_skills)
+                    }
+                )
+                
+                callbacks = [langfuse_callback] if langfuse_callback else None
+                
                 llm = ChatOpenAI(
                     model=model,
                     temperature=temperature,
-                    api_key=api_key
+                    api_key=api_key,
+                    callbacks=callbacks
                 )
                 
                 prompt_text = f"""Analyze which CV skills from the list below would be valuable or interesting for this job, even though they are not explicitly mentioned in the job description.

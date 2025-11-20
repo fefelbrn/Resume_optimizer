@@ -13,6 +13,7 @@ from utils.tools import (
     compare_skills_tool_with_rag
 )
 from utils.rag_system import RAGSystem
+from utils.langfuse_config import create_langfuse_callback
 
 
 class CVOptimizationState(TypedDict):
@@ -173,10 +174,30 @@ def compare_skills(state: CVOptimizationState) -> CVOptimizationState:
 def generate_optimized_cv(state: CVOptimizationState) -> CVOptimizationState:
     """Node 5: Generate optimized CV using LLM with RAG retrieval"""
     try:
+        langfuse_callback = create_langfuse_callback(
+            trace_name="cv_optimization",
+            session_id=state.get("session_id", "default"),
+            metadata={
+                "model": state["model"],
+                "temperature": state["temperature"],
+                "language": state["language"],
+                "min_experiences": state.get("min_experiences"),
+                "max_experiences": state.get("max_experiences"),
+                "max_date_years": state.get("max_date_years"),
+                "cv_length": len(state["cv_text"]),
+                "jd_length": len(state["job_description"]),
+                "has_rag": state.get("rag_system") is not None,
+                "step": "generate_optimized_cv"
+            }
+        )
+        
+        callbacks = [langfuse_callback] if langfuse_callback else None
+        
         llm = ChatOpenAI(
             model=state["model"],
             temperature=state["temperature"],
-            api_key=state["api_key"]
+            api_key=state["api_key"],
+            callbacks=callbacks
         )
         
         # Build context from previous steps
@@ -291,13 +312,29 @@ Create an optimized CV tailored to this job description. Maintain all factual in
         
         chain = prompt | llm
         
-        response = chain.invoke({
-            "rag_context": rag_context,
-            "job_description": state["job_description"],
-            "cv_text": state["cv_text"],
-            "cv_structure_info": cv_structure_info,
-            "skills_info": skills_info
-        })
+        # Préparer le contexte avec les métadonnées Langfuse
+        invoke_config = {}
+        if langfuse_callback:
+            invoke_config["callbacks"] = [langfuse_callback]
+            # Ajouter les tags pour Langfuse 3.x
+            invoke_config["tags"] = ["cv_optimization", f"session:{state.get('session_id', 'default')}"]
+            invoke_config["metadata"] = {
+                "model": state["model"],
+                "temperature": state["temperature"],
+                "language": state["language"],
+                "session_id": state.get("session_id", "default")
+            }
+        
+        response = chain.invoke(
+            {
+                "rag_context": rag_context,
+                "job_description": state["job_description"],
+                "cv_text": state["cv_text"],
+                "cv_structure_info": cv_structure_info,
+                "skills_info": skills_info
+            },
+            config=invoke_config if invoke_config else {}
+        )
         
         state["optimized_cv"] = response.content.strip()
         state["sources"] = {
@@ -352,6 +389,7 @@ def optimize_cv_with_agent(
     max_date_years: Optional[int] = None,
     language: str = "fr",
     rag_system: Optional[Any] = None,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Optimize CV using the agent-based workflow.
@@ -378,7 +416,8 @@ def optimize_cv_with_agent(
         "sources": None,
         "rag_details": None,
         "error": None,
-        "agent_logs": []
+        "agent_logs": [],
+        "session_id": session_id or "default"
     }
     
     agent = create_cv_optimization_agent()

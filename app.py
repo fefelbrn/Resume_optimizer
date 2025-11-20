@@ -6,6 +6,10 @@ from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import traceback
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis .env
+load_dotenv()
 from utils.pdf_parser import extract_text_from_pdf
 from utils.cv_optimizer_agent import optimize_cv_with_agent
 from utils.letter_generator import generate_cover_letter, parse_openai_error
@@ -13,6 +17,7 @@ from utils.skills_matcher import extract_skills, match_skills
 from utils.assistant_agent import process_assistant_request_with_agent
 from utils.pdf_generator import generate_harvard_pdf
 from utils.rag_system import RAGSystem
+from utils.langfuse_config import init_langfuse_client
 
 try:
     from langchain.memory import ConversationBufferMemory
@@ -131,7 +136,8 @@ def api_optimize_cv():
             max_experiences=max_experiences,
             max_date_years=max_date_years,
             language=language,
-            rag_system=rag_system  # Pass RAG system to agent
+            rag_system=rag_system,  # Pass RAG system to agent
+            session_id=session_id  # Pass session_id for Langfuse
         )
         
         if result.get('error'):
@@ -380,7 +386,8 @@ def api_assistant():
             temperature=temperature,
             language=language,
             memory=memory,
-            rag_system=rag_system  # NEW: Pass RAG system
+            rag_system=rag_system,  # NEW: Pass RAG system
+            session_id=session_id  # Pass session_id for Langfuse
         )
         
         if result.get('error'):
@@ -488,4 +495,6 @@ def api_download_pdf():
 
 
 if __name__ == '__main__':
+    # Initialiser Langfuse au démarrage si configuré
+    init_langfuse_client()
     app.run(debug=True, port=5001)

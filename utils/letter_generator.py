@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from typing import Dict, Any
 import re
+from utils.langfuse_config import create_langfuse_callback
 
 
 def parse_openai_error(error: Exception) -> Dict[str, Any]:
@@ -54,10 +55,24 @@ def generate_cover_letter(
     language: str = "fr",
 ) -> Dict[str, Any]:
     """Generate a personalized cover letter."""
+    # Créer callback Langfuse pour la génération de lettre
+    langfuse_callback = create_langfuse_callback(
+        trace_name="cover_letter_generation",
+        metadata={
+            "model": model,
+            "temperature": temperature,
+            "language": language,
+            "target_words": target_words
+        }
+    )
+    
+    callbacks = [langfuse_callback] if langfuse_callback else None
+    
     llm = ChatOpenAI(
         model=model,
         temperature=temperature,
-        api_key=api_key
+        api_key=api_key,
+        callbacks=callbacks
     )
     
     target_words = round(target_words / 10) * 10

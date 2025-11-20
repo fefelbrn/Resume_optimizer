@@ -64,6 +64,7 @@ from utils.tools import (
     extract_skills_tool,
     compare_skills_tool
 )
+from utils.langfuse_config import create_langfuse_callback
 
 
 def create_assistant_tools(api_key: str, optimized_cv: str) -> tuple[List[Tool], Callable[[], str]]:
@@ -164,17 +165,33 @@ def process_assistant_request_with_agent(
     temperature: float = 0.7,
     language: str = "fr",
     memory: Optional[ConversationBufferMemory] = None,
-    rag_system: Optional[Any] = None
+    rag_system: Optional[Any] = None,
+    session_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Process assistant request using a ReAct agent with tools and memory.
     Uses LangChain's AgentExecutor for true ReAct agent behavior.
     """
     try:
+        langfuse_callback = create_langfuse_callback(
+            trace_name="assistant_conversation",
+            session_id=session_id or "default",
+            metadata={
+                "model": model,
+                "temperature": temperature,
+                "language": language,
+                "has_rag": rag_system is not None,
+                "request_type": "cv_modification"
+            }
+        )
+        
+        callbacks = [langfuse_callback] if langfuse_callback else None
+        
         llm = ChatOpenAI(
             model=model,
             temperature=temperature,
-            api_key=api_key
+            api_key=api_key,
+            callbacks=callbacks
         )
         
         if memory is None:
@@ -340,9 +357,15 @@ DO NOT describe - ACT. Start by calling tools immediately."""
             
                 # Run the agent
                 # AgentExecutor handles memory automatically via the memory parameter
-                result = agent_executor.invoke({
-                    "input": input_text
-                })
+                # Pass callbacks to AgentExecutor
+                config = {}
+                if langfuse_callback:
+                    config["callbacks"] = [langfuse_callback]
+                
+                result = agent_executor.invoke(
+                    {"input": input_text},
+                    config=config if config else {}
+                )
                 
                 explanation = result.get("output", "")
                 
@@ -464,8 +487,6 @@ DO NOT describe - ACT. Start by calling tools immediately."""
         if not use_agent_executor:
             
             # Use simple LLM with tools in prompt (fallback implementation)
-            # NOTE: This fallback doesn't actually call tools - it's a limitation
-            # The user should use AgentExecutor for real tool usage
             system_message = f"""You are a helpful assistant that helps users refine their optimized CV and correct skills detection.
 
 {rag_context}
@@ -493,12 +514,20 @@ Analyze the request. If you need to use tools, describe which tool and how. Then
             
             chat_history = memory.chat_memory.messages if hasattr(memory, 'chat_memory') else []
             
-            response = chain.invoke({
-                "rag_context": rag_context,
-                "optimized_cv": optimized_cv,
-                "user_request": user_request,
-                "chat_history": chat_history
-            })
+            # Pass callbacks to chain invoke
+            invoke_config = {}
+            if langfuse_callback:
+                invoke_config["callbacks"] = [langfuse_callback]
+            
+            response = chain.invoke(
+                {
+                    "rag_context": rag_context,
+                    "optimized_cv": optimized_cv,
+                    "user_request": user_request,
+                    "chat_history": chat_history
+                },
+                config=invoke_config if invoke_config else {}
+            )
             
             explanation = response.content
             
