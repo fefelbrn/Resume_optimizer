@@ -1,5 +1,5 @@
 """
-Configuration Langfuse pour l'observabilité des LLM
+Langfuse configuration for LLM observability and Debug mode
 """
 import os
 from typing import Optional, Dict, Any
@@ -17,7 +17,7 @@ _langfuse_enabled = None
 _langfuse_client = None
 
 def init_langfuse_client() -> Optional[Any]:
-    """Initialise le client Langfuse global (requis pour Langfuse 3.x)"""
+    """Initializes the global Langfuse client (required for Langfuse 3 and above)"""
     global _langfuse_client, _langfuse_enabled
     
     if not LANGFUSE_AVAILABLE:
@@ -41,20 +41,19 @@ def init_langfuse_client() -> Optional[Any]:
             host=host
         )
         _langfuse_enabled = True
-        print("✅ Langfuse client initialisé")
+        print("Langfuse client initialized")
         return _langfuse_client
     except Exception as e:
-        print(f"⚠️  Erreur initialisation Langfuse: {e}")
+        print(f"Langfuse Initionlisation Error: {e}")
         _langfuse_enabled = False
         return None
 
 def is_langfuse_enabled() -> bool:
-    """Vérifie si Langfuse est configuré et disponible"""
+    """Check if Langfuse is configured and available"""
     global _langfuse_enabled
     if _langfuse_enabled is not None:
         return _langfuse_enabled
     
-    # Initialiser le client pour vérifier la configuration
     init_langfuse_client()
     return _langfuse_enabled or False
 
@@ -66,19 +65,19 @@ def create_langfuse_callback(
     metadata: Optional[Dict[str, Any]] = None
 ) -> Optional[Any]:
     """
-    Crée un callback Langfuse pour tracer un workflow.
+     Creates a Langfuse callback to trace a workflow.
     
-    Dans Langfuse 3.x, le CallbackHandler utilise les variables d'environnement
-    pour secret_key et host. Seul public_key est passé directement.
+    In Langfuse 3 or more, CallbackHandler uses environment variables
+    for secret_key and host. Only public_key is passed directly.
     
     Args:
-        trace_name: Nom de la trace (ex: "cv_optimization", "assistant_conversation")
-        user_id: ID utilisateur (optionnel)
-        session_id: ID de session (optionnel)
-        metadata: Métadonnées supplémentaires (optionnel)
+        trace_name: Trace name (e.g., “cv_optimization,” “conversational_assistant”)
+        user_id: User ID (optional)
+        session_id: Session ID (optional)
+        metadata: Additional metadata (optional)
     
     Returns:
-        CallbackHandler si Langfuse est configuré, None sinon
+        CallbackHandler if Langfuse is configured, None otherwise
     """
     if not LANGFUSE_AVAILABLE:
         return None
@@ -87,7 +86,6 @@ def create_langfuse_callback(
         return None
     
     try:
-        # S'assurer que le client Langfuse est initialisé (requis pour Langfuse 3.x)
         if not _langfuse_client:
             init_langfuse_client()
         
@@ -96,15 +94,11 @@ def create_langfuse_callback(
         
         public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
         
-        # Dans Langfuse 3.x, CallbackHandler utilise le client global initialisé
-        # et les variables d'environnement. On passe seulement public_key.
         handler = CallbackHandler(
             public_key=public_key
         )
         
-        # Note: trace_name, user_id, session_id et metadata sont gérés
-        # via le contexte LangChain lors de l'invocation, pas dans CallbackHandler
         return handler
     except Exception as e:
-        print(f"⚠️  Erreur création callback Langfuse: {e}")
+        print(f"Fallback Error: Callbakc error creating Langfuse: {e}")
         return None
