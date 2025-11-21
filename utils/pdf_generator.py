@@ -176,4 +176,3 @@ def generate_harvard_pdf(cv_text: str) -> BytesIO:
     doc.build(story)
     buffer.seek(0)
     return buffer
-

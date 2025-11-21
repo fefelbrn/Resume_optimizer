@@ -12,29 +12,29 @@ def parse_openai_error(error: Exception) -> Dict[str, Any]:
     """Parse OpenAI API errors and return user-friendly messages."""
     error_str = str(error)
     error_code = None
-    user_message = "Une erreur s'est produite lors de l'appel à l'API OpenAI."
+    user_message = "An error occurred while calling your OpenAI API."
     
     if "401" in error_str or "invalid_api_key" in error_str.lower() or "Incorrect API key" in error_str:
         error_code = 401
         user_message = (
-            "Erreur: Clé API OpenAI invalide.\n\n"
-            "Votre clé API n'est pas valide ou a expiré. Veuillez:\n"
-            "1. Vérifier que vous avez copié la clé complète\n"
-            "2. Obtenir une nouvelle clé sur: https://platform.openai.com/account/api-keys\n"
-            "3. Vérifier que votre compte OpenAI a des crédits disponibles"
+            "Error: Invalid OpenAI API key.\n\n"
+            "Your API key is invalid or has expired. Please:\n"
+            "1. Verify that you have copied the entire key\n"
+            "2. Obtain a new key at: https://platform.openai.com/account/api-keys\n"
+            "3. Verify that your OpenAI account has available credits"
         )
     elif "429" in error_str or "rate_limit" in error_str.lower():
         error_code = 429
         user_message = (
-            "Erreur: Limite de taux dépassée.\n\n"
-            "Vous avez fait trop de requêtes. Veuillez attendre quelques instants avant de réessayer."
+            "Error: Rate limit exceeded.\n\n"
+            "You have made too many requests. Please wait a few moments before trying again."
         )
     elif "insufficient_quota" in error_str.lower() or "billing" in error_str.lower():
         error_code = "billing"
         user_message = (
-            "Erreur: Crédits insuffisants.\n\n"
-            "Votre compte OpenAI n'a plus de crédits disponibles. "
-            "Veuillez ajouter des crédits sur: https://platform.openai.com/account/billing"
+            "Error: Insufficient credits.\n\n"
+            "Your OpenAI account has no credits left."
+            "Please add credits at: https://platform.openai.com/account/billing"
         )
     
     return {
@@ -55,7 +55,7 @@ def generate_cover_letter(
     language: str = "fr",
 ) -> Dict[str, Any]:
     """Generate a personalized cover letter."""
-    # Créer callback Langfuse pour la génération de lettre
+    # Creat a Langfuse callback for the cover letter generation
     langfuse_callback = create_langfuse_callback(
         trace_name="cover_letter_generation",
         metadata={
@@ -158,4 +158,3 @@ Write everything in {target_language}.""")
             "error_details": error_info["error_message"],
             "cover_letter": None
         }
-

@@ -8,7 +8,6 @@ from langchain_core.tools import Tool
 from typing import Dict, Any, List, Optional, Callable
 import json
 
-# Try to import AgentExecutor - different versions have different locations
 try:
     from langchain.agents import AgentExecutor, create_react_agent
     from langchain import hub
@@ -95,7 +94,7 @@ def create_assistant_tools(api_key: str, optimized_cv: str) -> tuple[List[Tool],
         return json.dumps(result)
     
     # Store current CV in closure for tools that need it
-    current_cv = [optimized_cv]  # Use list to allow modification in nested functions
+    current_cv = [optimized_cv]
     
     def update_cv_section_wrapper(section: str, content: str) -> str:
         """Update CV section using the current CV."""
@@ -117,7 +116,7 @@ def create_assistant_tools(api_key: str, optimized_cv: str) -> tuple[List[Tool],
         })
         return json.dumps(result)
     
-    # Function to get current CV (for updating after tool calls)
+    # Function to get current CV (for update after tool calls)
     def get_current_cv() -> str:
         return current_cv[0]
     
@@ -313,7 +312,7 @@ Thought: {agent_scratchpad}""")
         
         if use_agent_executor and agent_executor:
             try:
-                # Prepare input with context - STRICT: Must use tools, not describe
+                # Prepare input with context (STRICT: Must use tools, not describe)
                 input_text = f"""You are a helpful assistant that helps users refine their optimized CV and correct skills detection.
 
 {rag_context}
@@ -355,9 +354,7 @@ Action: update_cv_section(section_name="Header", new_content="<section without t
 
 DO NOT describe - ACT. Start by calling tools immediately."""
             
-                # Run the agent
                 # AgentExecutor handles memory automatically via the memory parameter
-                # Pass callbacks to AgentExecutor
                 config = {}
                 if langfuse_callback:
                     config["callbacks"] = [langfuse_callback]
@@ -596,4 +593,3 @@ Analyze the request. If you need to use tools, describe which tool and how. Then
             "updated_cv": optimized_cv,
             "explanation": None
         }
-

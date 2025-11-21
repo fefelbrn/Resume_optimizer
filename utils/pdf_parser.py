@@ -19,7 +19,6 @@ def extract_text_from_pdf(pdf_file) -> str:
     """
     text = ""
     
-    # Try pdfplumber first (better for complex layouts)
     try:
         if isinstance(pdf_file, bytes):
             pdf_file = BytesIO(pdf_file)
@@ -49,4 +48,3 @@ def extract_text_from_pdf(pdf_file) -> str:
         print(f"PyPDF2 failed: {e}")
     
     return text.strip() if text else ""
-

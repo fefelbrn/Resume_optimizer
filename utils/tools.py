@@ -584,4 +584,3 @@ def search_cv_content_tool(cv_text: str, search_term: str) -> Dict[str, Any]:
             "status": "error",
             "error": str(e)
         }
-
