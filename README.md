@@ -98,6 +98,23 @@ We decided to rebuild the application using agents because:
 
 **Why this approach**: Provides a clean separation between the agent internals and the API layer.
 
+#### 6. Observability System (`utils/langfuse_config.py`)
+
+**What it does**: Provides unified tracing and observability for the entire LangGraph workflow using Langfuse.
+
+**How it works**:
+- Creates a single trace for each CV optimization workflow
+- All nodes (analyze_structure, extract_cv_skills, etc.) create spans under the same trace
+- Captures input parameters (CV length, job description length, model, etc.) at trace level
+- Updates trace output with results (optimized CV length, word count, skills counts, etc.)
+- Links all LLM calls and tool invocations to the parent trace
+
+**Why this approach**: 
+- **Unified view**: Instead of multiple separate traces, you see one complete workflow trace
+- **Better debugging**: All operations are grouped together, making it easier to understand the full optimization process
+- **Performance insights**: Track latency and costs across the entire workflow
+- **Session tracking**: Monitor multiple optimization sessions over time
+
 ### Application Flow
 
 1. **User uploads CV and job description** → Files are parsed and text is extracted
@@ -122,9 +139,54 @@ We decided to rebuild the application using agents because:
 - **Backend**: Flask (Python web framework)
 - **AI Framework**: LangChain, LangGraph
 - **LLM**: OpenAI GPT models (configurable)
+- **Observability**: Langfuse (tracing and monitoring)
+- **RAG**: OpenAI Embeddings, Chroma (vector database)
 - **PDF Processing**: PyPDF2, pdfplumber
 - **PDF Generation**: ReportLab
 - **Frontend**: Vanilla JavaScript, HTML, CSS
+- **Visualization**: Mermaid.js (workflow graphs)
+
+## Installation & Setup
+
+### Prerequisites
+
+- Python 3.8 or higher
+- OpenAI API key
+- (Optional) Langfuse account for observability
+
+### Installation Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd "projet resume optimizer"
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables**
+   
+   Create a `.env` file in the project root (optional, for Langfuse observability):
+   ```env
+   # Langfuse Configuration (Optional - for observability)
+   LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
+   LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+   LANGFUSE_HOST=https://cloud.langfuse.com  # Optional, defaults to cloud
+   ```
+   
+   **Note**: The OpenAI API key is provided by users through the web interface and is not stored.
+
+4. **Run the application**
+   ```bash
+   python app.py
+   ```
+
+5. **Access the application**
+   
+   Open your browser and navigate to: `http://localhost:5001`
 
 ## Project Structure
 
@@ -132,6 +194,7 @@ We decided to rebuild the application using agents because:
 .
 ├── app.py                      # Flask application and API endpoints
 ├── requirements.txt            # Python dependencies
+├── .env                        # Environment variables (optional, for Langfuse)
 ├── templates/
 │   └── index.html             # Frontend interface
 ├── static/
@@ -139,6 +202,7 @@ We decided to rebuild the application using agents because:
 │   │   └── style.css         # Styling
 │   └── js/
 │       └── main.js           # Frontend logic
+├── uploads/                   # Temporary storage for uploaded files
 └── utils/
     ├── __init__.py
     ├── cv_optimizer_agent.py  # LangGraph workflow for CV optimization
@@ -146,6 +210,7 @@ We decided to rebuild the application using agents because:
     ├── tools.py               # LangChain tools (@tool decorator)
     ├── rag_system.py         # RAG system for vectorization and semantic search
     ├── skills_matcher.py     # Skills extraction and matching API
+    ├── langfuse_config.py   # Langfuse configuration for observability
     ├── pdf_parser.py         # PDF text extraction
     ├── pdf_generator.py      # PDF generation (Harvard template)
     └── letter_generator.py   # Cover letter generation
@@ -197,6 +262,14 @@ We removed all fallback implementations because:
 - They make the system harder to maintain
 - They hide architectural issues
 
+### 7. Unified Observability with Langfuse
+We integrated Langfuse for observability because:
+- Provides a single unified trace for the entire LangGraph workflow
+- All nodes create spans under the same trace, not separate traces
+- Captures input/output at the trace level for better debugging
+- Enables performance monitoring and cost tracking
+- Makes it easy to understand the complete optimization flow
+
 ## API Endpoints
 
 - `GET /` - Serve the main interface
@@ -210,14 +283,41 @@ We removed all fallback implementations because:
 
 ## Configuration
 
+### Application Settings
+
 The application runs on port **5001** (changed from 5000 to avoid conflicts with macOS AirPlay Receiver).
 
-All configuration is done through the web interface:
-- OpenAI API key (user-provided, not stored)
-- Model selection (GPT-4o-mini, GPT-4, etc.)
-- Temperature settings
-- Language selection (French, English, Spanish)
-- CV optimization parameters (min/max experiences, date filters)
+### User Configuration (Web Interface)
+
+All user configuration is done through the web interface:
+- **OpenAI API key**: User-provided, not stored (used only for the current session)
+- **Model selection**: GPT-4o-mini, GPT-4, etc.
+- **Temperature settings**: Controls randomness in LLM responses
+- **Language selection**: French, English, Spanish
+- **CV optimization parameters**: Min/max experiences, date filters
+
+### Observability Configuration (Optional)
+
+The application supports **Langfuse** for observability and tracing. This is optional but recommended for monitoring and debugging.
+
+**To enable Langfuse**:
+1. Create a Langfuse account at [langfuse.com](https://langfuse.com)
+2. Get your public key and secret key from the Langfuse dashboard
+3. Create a `.env` file in the project root:
+   ```env
+   LANGFUSE_PUBLIC_KEY=your_public_key_here
+   LANGFUSE_SECRET_KEY=your_secret_key_here
+   LANGFUSE_HOST=https://cloud.langfuse.com  # Optional
+   ```
+
+**What Langfuse provides**:
+- **Unified tracing**: All nodes of the LangGraph workflow are traced as a single trace with multiple spans
+- **Input/Output tracking**: Trace input (optimization parameters) and output (results) are captured
+- **Performance monitoring**: Latency and cost tracking for each operation
+- **Debugging**: Detailed logs of all LLM calls and tool invocations
+- **Session management**: Track multiple optimization sessions
+
+**Without Langfuse**: The application works normally, but observability features are disabled.
 
 ## Development History
 
@@ -424,15 +524,62 @@ The application provides comprehensive execution logs accessible via the "View L
 - **Input Validation**: All inputs are validated before processing
 - **Error Messages**: Error messages don't expose sensitive information
 
+## Observability & Monitoring
+
+### Langfuse Integration
+
+The application uses **Langfuse** for comprehensive observability of the agent workflows. When configured, Langfuse provides:
+
+#### Unified Trace Structure
+
+Each CV optimization creates a **single trace** with the following structure:
+
+```
+Trace: "cv_optimization"
+├── Input: {cv_text_length, job_description_length, model, temperature, ...}
+├── Span: analyze_structure
+│   └── Tool: analyze_cv_structure_tool
+├── Span: extract_cv_skills
+│   └── Tool: extract_skills_tool
+│       └── LLM Call: ChatOpenAI
+├── Span: index_cv_rag
+│   └── RAG: Vectorization and indexing
+├── Span: extract_job_skills
+│   └── Tool: extract_skills_tool
+│       └── LLM Call: ChatOpenAI
+├── Span: index_jd_rag
+│   └── RAG: Vectorization and indexing
+├── Span: compare_skills
+│   └── Tool: compare_skills_tool_with_rag
+│       └── LLM Call: ChatOpenAI (if needed)
+└── Span: generate_cv
+    └── LLM Call: ChatOpenAI
+    └── Output: {optimized_cv_length, word_count, skills_counts, ...}
+```
+
+#### Benefits
+
+- **Single trace view**: All workflow steps are visible in one place
+- **Input/Output tracking**: See what went in and what came out
+- **Performance metrics**: Latency and cost for each operation
+- **Error tracking**: Identify which node failed and why
+- **Session correlation**: Track multiple optimizations in the same session
+
+#### Accessing Traces
+
+1. Go to your Langfuse dashboard
+2. Navigate to "Tracing" section
+3. Filter by trace name "cv_optimization"
+4. Click on a trace to see the complete workflow with all spans
+
 ## Future Improvements
 
 - Add more sophisticated error recovery in agents
-- Implement agent observability and logging
 - Add support for more file formats (DOCX, RTF)
 - Create agent-specific configuration options
 - Implement agent chaining for complex workflows
 - Add unit tests for agents and tools
 - Implement streaming responses for better UX
-- Add agent performance metrics and monitoring
 - Support for custom tool creation by users
 - Multi-language support for agent responses
+- Enhanced Langfuse integration with custom metrics
