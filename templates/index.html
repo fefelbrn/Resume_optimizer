@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>📄 CV Optimizer</h1>
+            <h1>CV Optimizer</h1>
             <p class="subtitle">Optimize your CV and generate a personalized cover letter</p>
         </header>
 
@@ -28,7 +28,7 @@
             <div id="generation-content" class="main-tab-content active">
             <!-- Configuration Section -->
             <section class="config-section">
-                <h2>⚙️ Configuration</h2>
+                <h2>Configuration</h2>
                 
                 <div class="form-group">
                     <label for="api-key">
@@ -180,7 +180,7 @@
 
             <!-- CV Optimization Parameters -->
             <section class="params-section">
-                <h2>🎯 CV Optimization Parameters</h2>
+                <h2>CV Optimization Parameters</h2>
                 
                 <div class="params-grid">
                     <div class="form-group">
@@ -203,10 +203,10 @@
 
             <!-- Cover Letter Parameters -->
             <section class="params-section">
-                <h2>✉️ Cover Letter Parameters</h2>
+                <h2>Cover Letter Parameters</h2>
                 
                 <div class="form-group">
-                    <label for="letter-words">Number of words (by tens)</label>
+                    <label for="letter-words">Number of words</label>
                     <input type="number" id="letter-words" min="100" max="1000" step="10" value="300">
                     <small>Ex: 300 = approximately 300 words</small>
                 </div>
@@ -217,13 +217,14 @@
                 <button id="optimize-btn" class="btn-primary">
                     <span class="btn-icon">✨</span>
                     Optimize CV
+                    <span class="btn-icon">✨</span>
                 </button>
                 <button id="generate-letter-btn" class="btn-primary">
                     <span class="btn-icon">✉️</span>
                     Generate Cover Letter
+                    <span class="btn-icon">✉️</span>
                 </button>
                 <button id="view-logs-btn" class="btn-secondary" style="margin-top: 0.5rem; width: 100%;" disabled>
-                    <span class="btn-icon">📊</span>
                     View Execution Logs
                 </button>
             </section>
@@ -271,14 +272,14 @@
                 <!-- Assistant Chat Tab -->
                 <div class="tab-content" id="assistant-tab">
                     <div class="assistant-header">
-                        <h3>💬 Conversational Assistant</h3>
+                        <h3>💬 Conversational Assistant 💬</h3>
                         <p class="assistant-description">Request adjustments to your optimized CV or correct detected skills</p>
                     </div>
                     
                     <div class="assistant-chat-container">
                         <div id="assistant-messages" class="assistant-messages">
                             <div class="assistant-empty">
-                                <p>💬 Start by generating an optimized CV, then request adjustments here</p>
+                                <p>Start by generating an optimized CV, then request adjustments here</p>
                                 <p class="assistant-examples">
                                     Examples:<br>
                                     • "Add advanced Excel skill"<br>

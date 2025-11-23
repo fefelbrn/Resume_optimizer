@@ -13,7 +13,7 @@ from utils.tools import (
     compare_skills_tool_with_rag
 )
 from utils.rag_system import RAGSystem
-from utils.langfuse_config import create_langfuse_callback
+from utils.langfuse_config import create_langfuse_callback, create_langgraph_tracer
 
 
 class CVOptimizationState(TypedDict):
@@ -174,30 +174,11 @@ def compare_skills(state: CVOptimizationState) -> CVOptimizationState:
 def generate_optimized_cv(state: CVOptimizationState) -> CVOptimizationState:
     """Node 5: Generate optimized CV using LLM with RAG retrieval"""
     try:
-        langfuse_callback = create_langfuse_callback(
-            trace_name="cv_optimization",
-            session_id=state.get("session_id", "default"),
-            metadata={
-                "model": state["model"],
-                "temperature": state["temperature"],
-                "language": state["language"],
-                "min_experiences": state.get("min_experiences"),
-                "max_experiences": state.get("max_experiences"),
-                "max_date_years": state.get("max_date_years"),
-                "cv_length": len(state["cv_text"]),
-                "jd_length": len(state["job_description"]),
-                "has_rag": state.get("rag_system") is not None,
-                "step": "generate_optimized_cv"
-            }
-        )
-        
-        callbacks = [langfuse_callback] if langfuse_callback else None
         
         llm = ChatOpenAI(
             model=state["model"],
             temperature=state["temperature"],
-            api_key=state["api_key"],
-            callbacks=callbacks
+            api_key=state["api_key"]
         )
         
         # Build context from previous steps
@@ -312,29 +293,15 @@ Create an optimized CV tailored to this job description. Maintain all factual in
         
         chain = prompt | llm
         
-        # Préparer le contexte avec les métadonnées Langfuse
-        invoke_config = {}
-        if langfuse_callback:
-            invoke_config["callbacks"] = [langfuse_callback]
-            # Ajouter les tags pour Langfuse 3.x
-            invoke_config["tags"] = ["cv_optimization", f"session:{state.get('session_id', 'default')}"]
-            invoke_config["metadata"] = {
-                "model": state["model"],
-                "temperature": state["temperature"],
-                "language": state["language"],
-                "session_id": state.get("session_id", "default")
-            }
-        
-        response = chain.invoke(
-            {
-                "rag_context": rag_context,
-                "job_description": state["job_description"],
-                "cv_text": state["cv_text"],
-                "cv_structure_info": cv_structure_info,
-                "skills_info": skills_info
-            },
-            config=invoke_config if invoke_config else {}
-        )
+        # No individual callback config - the callback from graph level will handle tracing
+        # All nodes will create spans under the same trace automatically
+        response = chain.invoke({
+            "rag_context": rag_context,
+            "job_description": state["job_description"],
+            "cv_text": state["cv_text"],
+            "cv_structure_info": cv_structure_info,
+            "skills_info": skills_info
+        })
         
         state["optimized_cv"] = response.content.strip()
         state["sources"] = {
@@ -366,7 +333,7 @@ def create_cv_optimization_agent() -> StateGraph:
     # Entry point for the workflow
     workflow.set_entry_point("analyze_structure")
     
-    # Add edges for the workflow
+    # Adding edges for the workflow
     workflow.add_edge("analyze_structure", "extract_cv_skills")
     workflow.add_edge("extract_cv_skills", "index_cv_rag")
     workflow.add_edge("index_cv_rag", "extract_job_skills")
@@ -422,8 +389,69 @@ def optimize_cv_with_agent(
     
     agent = create_cv_optimization_agent()
     
+    # LangGraph tracer for unified trace (all nodes in one trace)
+    trace_input = {
+        "cv_text_length": len(cv_text),
+        "job_description_length": len(job_description),
+        "model": model,
+        "temperature": temperature,
+        "language": language,
+        "min_experiences": min_experiences,
+        "max_experiences": max_experiences,
+        "max_date_years": max_date_years,
+        "has_rag": rag_system is not None
+    }
+    
+    langgraph_tracer, langfuse_trace = create_langgraph_tracer(
+        trace_name="cv_optimization",
+        session_id=session_id or "default",
+        metadata={
+            "model": model,
+            "temperature": temperature,
+            "language": language,
+            "min_experiences": min_experiences,
+            "max_experiences": max_experiences,
+            "max_date_years": max_date_years,
+            "cv_length": len(cv_text),
+            "jd_length": len(job_description),
+            "has_rag": rag_system is not None
+        },
+        trace_input=trace_input
+    )
+    
+    invoke_config = {}
+    if langgraph_tracer:
+        invoke_config["callbacks"] = [langgraph_tracer]
+        # Pass trace metadata via configurable for Langfuse
+        invoke_config["configurable"] = {
+            "langfuse_trace_name": "cv_optimization",
+            "langfuse_session_id": session_id or "default"
+        }
+        if langgraph_tracer and hasattr(langgraph_tracer, '_trace_id'):
+            invoke_config["configurable"]["langfuse_trace_id"] = langgraph_tracer._trace_id
+        invoke_config["metadata"] = {
+            "trace_name": "cv_optimization",
+            "session_id": session_id or "default",
+            "model": model,
+            "temperature": temperature,
+            "language": language
+        }
+    
     try:
-        final_state = agent.invoke(initial_state)
+        final_state = agent.invoke(initial_state, config=invoke_config if invoke_config else {})
+        
+        if langfuse_trace and final_state.get("optimized_cv"):
+            try:
+                trace_output = {
+                    "optimized_cv_length": len(final_state.get("optimized_cv", "")),
+                    "word_count": len(final_state.get("optimized_cv", "").split()),
+                    "cv_skills_count": len(final_state.get("cv_skills", [])),
+                    "job_skills_count": len(final_state.get("job_skills", [])),
+                    "has_error": final_state.get("error") is not None
+                }
+                langfuse_trace.update(output=trace_output)
+            except Exception as e:
+                print(f"Error updating Langfuse trace output: {e}")
         
         if final_state.get("error"):
             return {
